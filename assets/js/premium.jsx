@@ -6,7 +6,7 @@ const PremiumStore = (function () {
   let email = "anon";
   let state = null;
   const subs = new Set();
-  const DEF = { premium: true, plano: "month", lembretes: [], recorrentes: [], grupos: [], subscricoes: [], pagosSub: {} };
+  const DEF = { premium: true, plano: "month", lembretes: [], recorrentes: [], grupos: [], subscricoes: [], pagosSub: {}, notif: { ativo: true, aviso: 3 }, notifLog: {} };
   const KEY = () => "rende_premium_" + email;
   const read = () => { try { return { ...DEF, ...(JSON.parse(localStorage.getItem(KEY()) || "{}")) }; } catch (e) { return { ...DEF }; } };
   const persist = () => { try { localStorage.setItem(KEY(), JSON.stringify(state)); } catch (e) {} };
@@ -735,6 +735,149 @@ function SubscricoesInner() {
         </>
       )}
       {modal && <SubModal mesAtual={mes} onClose={() => setModal(false)} onSave={(it) => { prem.add("subscricoes", it); setModal(false); }} />}
+    </div>
+  );
+}
+
+/* ---------------- Notificações (avisos de pagamento) ---------------- */
+/* Varre lembretes (por pagar) e subscrições (por pagar no mês atual) e
+   devolve os que vencem dentro de X dias (cfg.aviso) ou já estão atrasados.
+   Baseia-se SEMPRE na data real de hoje, não no mês que estás a ver. */
+function scanAlertas(prem) {
+  const s = prem.get();
+  const aviso = (s.notif && typeof s.notif.aviso === "number") ? s.notif.aviso : 3;
+  const out = [];
+  (s.lembretes || []).filter((l) => !l.pago).forEach((l) => {
+    const d = daysUntil(l.data);
+    if (d <= aviso) out.push({ chave: "lem:" + l.id, tipo: "lembrete", id: l.id, titulo: l.titulo, valor: l.valor, d });
+  });
+  const mes = BM.todayISO().slice(0, 7);
+  const pagos = s.pagosSub || {};
+  (s.subscricoes || []).filter((x) => !x.desde || x.desde <= mes).forEach((x) => {
+    if (pagos[x.id] && pagos[x.id][mes]) return; // já paga este mês
+    const alvo = mes + "-" + String(Math.min(28, x.dia || 1)).padStart(2, "0");
+    const d = daysUntil(alvo);
+    if (d <= aviso) out.push({ chave: "sub:" + x.id + ":" + mes, tipo: "subscricao", id: x.id, titulo: x.nome, valor: x.valor, d });
+  });
+  return out.sort((a, b) => a.d - b.d);
+}
+
+/* Resolve um alerta (marca como pago). */
+function resolverAlerta(prem, a) {
+  if (a.tipo === "lembrete") {
+    const l = (prem.get().lembretes || []).find((x) => x.id === a.id);
+    if (l && l.repete) { const dt = new Date(l.data + "T00:00:00"); dt.setMonth(dt.getMonth() + 1); prem.edit("lembretes", a.id, { data: dt.toISOString().slice(0, 10) }); }
+    else prem.edit("lembretes", a.id, { pago: true });
+  } else {
+    const mes = BM.todayISO().slice(0, 7);
+    const cur = prem.get().pagosSub || {};
+    prem.update({ pagosSub: { ...cur, [a.id]: { ...(cur[a.id] || {}), [mes]: true } } });
+  }
+}
+
+/* Dispara notificações nativas do dispositivo (só enquanto a app está aberta).
+   Junta tudo numa só notificação-resumo e não repete o mesmo aviso no mesmo dia. */
+function dispararNotificacoesNativas(prem) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  const s = prem.get();
+  if (!(s.notif && s.notif.ativo)) return;
+  const hoje = BM.todayISO();
+  const log = s.notifLog || {};
+  const jaHoje = new Set(log[hoje] || []);
+  const novos = scanAlertas(prem).filter((a) => !jaHoje.has(a.chave));
+  if (!novos.length) return;
+  const titulo = novos.length === 1 ? "Tens um pagamento a tratar" : `Tens ${novos.length} pagamentos a tratar`;
+  const corpo = novos.slice(0, 3).map((a) => `${a.titulo} · ${BM.eur(a.valor)}`).join("\n") + (novos.length > 3 ? `\n+ ${novos.length - 3} mais` : "");
+  try { new Notification("Rende+ · " + titulo, { body: corpo, icon: "/icon-192.png", badge: "/icon-192.png", tag: "rende-pagamentos", renotify: true }); } catch (e) {}
+  prem.update({ notifLog: { [hoje]: [...jaHoje, ...novos.map((a) => a.chave)] } }); // guarda só o dia de hoje (auto-limpa o passado)
+}
+
+const quandoTxt = (d) => d < 0 ? `há ${Math.abs(d)} dia${d === -1 ? "" : "s"}` : d === 0 ? "vence hoje" : `vence em ${d} dia${d > 1 ? "s" : ""}`;
+
+function NotifBell() {
+  const prem = usePremium();
+  const [open, setOpen] = React.useState(false);
+  const [perm, setPerm] = React.useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+  const s = prem.get();
+  const cfg = s.notif || { ativo: true, aviso: 3 };
+  const alertas = scanAlertas(prem);
+  const count = alertas.length;
+
+  // dispara ao abrir a app e a cada 30 min enquanto está aberta
+  React.useEffect(() => {
+    if (!cfg.ativo) return;
+    const tick = () => dispararNotificacoesNativas(prem);
+    tick();
+    const iv = setInterval(tick, 1000 * 60 * 30);
+    return () => clearInterval(iv);
+  }, [cfg.ativo]);
+
+  const pedirPermissao = () => {
+    if (typeof Notification === "undefined") return;
+    Notification.requestPermission().then((p) => { setPerm(p); if (p === "granted") dispararNotificacoesNativas(prem); });
+  };
+  const setCfg = (patch) => prem.update({ notif: { ...cfg, ...patch } });
+
+  return (
+    <div className="notif-wrap">
+      <button className="icon-btn notif-btn" title="Notificações" onClick={() => setOpen((v) => !v)}>
+        <Icon name="bell" size={18} />
+        {count > 0 && <span className="notif-badge">{count > 9 ? "9+" : count}</span>}
+      </button>
+      {open && (
+        <>
+          <div className="notif-pop-bg" onClick={() => setOpen(false)} />
+          <div className="notif-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="notif-head">
+              <span style={{ fontWeight: 800, fontSize: 14.5 }}>Notificações</span>
+              {count > 0 && <span className="notif-head-count">{count}</span>}
+            </div>
+
+            {perm !== "granted" && perm !== "unsupported" && (
+              <div className="notif-perm">
+                <div>
+                  <b style={{ fontSize: 13 }}>Ativar avisos no dispositivo</b>
+                  <span style={{ display: "block", fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                    {perm === "denied" ? "Estão bloqueados — ativa-os nas definições do navegador." : "Para receberes avisos mesmo fora desta página."}
+                  </span>
+                </div>
+                {perm === "default" && <button className="btn btn-primary" style={{ padding: "8px 12px", fontSize: 12.5 }} onClick={pedirPermissao}>Ativar</button>}
+              </div>
+            )}
+
+            <div className="notif-list">
+              {alertas.length === 0 ? (
+                <div className="notif-empty"><Icon name="check" size={20} color="var(--accent)" /><span>Estás em dia. Nada a pagar por agora.</span></div>
+              ) : (
+                alertas.map((a) => {
+                  const cor = a.d < 0 ? "var(--neg)" : a.d === 0 ? "var(--neg)" : "var(--accent)";
+                  return (
+                    <div className="notif-item" key={a.chave}>
+                      <span className="notif-item-ico" style={{ background: `color-mix(in srgb, ${cor} 14%, transparent)` }}><Icon name={a.tipo === "subscricao" ? "tv" : "bell"} size={16} color={cor} /></span>
+                      <div className="notif-item-txt">
+                        <b>{a.titulo}</b>
+                        <span style={{ color: cor, fontWeight: 700 }}>{quandoTxt(a.d)} · {BM.eur(a.valor)}</span>
+                      </div>
+                      <button className="btn btn-soft" style={{ padding: "6px 11px", fontSize: 12 }} onClick={() => resolverAlerta(prem, a)}>Pagar</button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="notif-foot">
+              <button className={"notif-switch" + (cfg.ativo ? " on" : "")} onClick={() => setCfg({ ativo: !cfg.ativo })} title="Ligar/desligar avisos">
+                <span className="notif-switch-dot" />
+              </button>
+              <span style={{ fontSize: 12.5, fontWeight: 600, flex: 1 }}>Avisos {cfg.ativo ? "ativos" : "desligados"}</span>
+              <span style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600 }}>Avisar</span>
+              <select className="select" style={{ width: "auto", padding: "5px 8px", fontSize: 12.5 }} value={cfg.aviso} onChange={(e) => setCfg({ aviso: +e.target.value })}>
+                {[1, 3, 5, 7].map((n) => <option key={n} value={n}>{n} dia{n > 1 ? "s" : ""} antes</option>)}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

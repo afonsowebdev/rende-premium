@@ -129,6 +129,7 @@ function Topbar({ title, sub, theme, setTheme, onLogout, onAdd, addLabel, monthN
             <Icon name="plus" size={16} color="#fff" /> <span className="hide-mobile">{addLabel || tr("add_generic")}</span>
           </button>
         )}
+        <NotifBell />
         <button className="icon-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title={tr("theme_title")}>
           <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
         </button>
