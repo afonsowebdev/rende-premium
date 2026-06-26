@@ -140,24 +140,33 @@ function Topbar({ title, sub, theme, setTheme, onLogout, onAdd, addLabel, monthN
 }
 
 function MobileNav({ route, go, onMore }) {
-  const tr = useT();
+  const fin = useFinance();
+  const acc = fin.account || {};
   const tabs = [
-    { id: "dashboard", label: "Início", icon: "home" },
-    { id: "despesas", label: "Despesas", icon: "wallet" },
+    { id: "dashboard", label: "Início", icon: "grid" },
+    { id: "despesas", label: "Despesas", icon: "card" },
     { id: "rendimentos", label: "Receita", icon: "coins" },
     { id: "perfil", label: "Perfil", icon: "user" },
   ];
   const moreRoutes = ["poupanca", "relatorios", "historico", "config", "subscricoes", "lembretes", "recorrentes", "partilha", "previsao", "premium"];
+  const inicial = ((acc.nome || "").trim().charAt(0) || "?").toUpperCase();
   return (
     <nav className="mobilenav">
-      {tabs.map((t) => (
-        <button key={t.id} className={"mtab" + (route === t.id ? " on" : "")} onClick={() => go(t.id)}>
-          <Icon name={t.icon} size={22} sw={route === t.id ? 2.2 : 1.8} />
-          <span>{t.label}</span>
-        </button>
-      ))}
+      {tabs.map((t) => {
+        const on = route === t.id;
+        return (
+          <button key={t.id} className={"mtab" + (on ? " on" : "")} onClick={() => go(t.id)}>
+            {t.id === "perfil"
+              ? (acc.foto
+                  ? <img src={acc.foto} alt="" className={"mtab-av" + (on ? " on" : "")} />
+                  : <span className={"mtab-av mtab-av-ph" + (on ? " on" : "")}>{inicial}</span>)
+              : <Icon name={t.icon} size={21} sw={on ? 2.2 : 1.8} />}
+            <span>{t.label}</span>
+          </button>
+        );
+      })}
       <button className={"mtab mtab-more" + (moreRoutes.includes(route) ? " on" : "")} onClick={onMore}>
-        <Icon name="dots" size={22} sw={2.4} />
+        <Icon name="dots" size={21} sw={2.4} />
         <span>Mais</span>
       </button>
     </nav>
