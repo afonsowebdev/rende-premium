@@ -36,6 +36,7 @@ const PAGES = {
   config: { title: "Definições", add: null },
   lembretes: { title: "Lembretes", add: null },
   recorrentes: { title: "Recorrentes", add: null },
+  subscricoes: { title: "Subscrições", add: null },
   partilha: { title: "Partilha", add: null },
   previsao: { title: "Previsão", add: null },
   premium: { title: "Rende+ Premium", add: null },
@@ -43,6 +44,7 @@ const PAGES = {
 const PREM_PAGE = {
   lembretes: ["Lembretes", "Nunca falhes um pagamento"],
   recorrentes: ["Recorrentes", "Despesas que se repetem todos os meses"],
+  subscricoes: ["Subscrições", "As tuas contas de streaming, mês a mês"],
   partilha: ["Partilha", "Contas divididas, sem confusão"],
   previsao: ["Previsão", "Para onde vai o teu mês"],
   premium: ["Rende+ Premium", "Desbloqueia tudo"],
@@ -443,7 +445,7 @@ function Shell() {
     historico: tr("sub_historico"),
     config: tr("sub_config"),
   };
-  const showMonthNav = ["dashboard", "despesas", "rendimentos", "relatorios"].includes(route);
+  const showMonthNav = ["dashboard", "despesas", "rendimentos", "relatorios", "subscricoes"].includes(route);
 
   return (
     <div className={"app" + (sbCollapsed ? " sb-collapsed" : "")}>
@@ -464,6 +466,7 @@ function Shell() {
         {route === "config" && <Definicoes theme={theme} setTheme={setTheme} open={open} />}
         {route === "lembretes" && <Lembretes />}
         {route === "recorrentes" && <Recorrentes />}
+        {route === "subscricoes" && <Subscricoes />}
         {route === "partilha" && <Partilha />}
         {route === "previsao" && <Previsao />}
         {route === "premium" && <Paywall />}

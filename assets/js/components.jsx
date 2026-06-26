@@ -59,6 +59,7 @@ function Sidebar({ route, go, account, collapsed, onToggle }) {
     { id: "config", label: tr("lbl_settings"), icon: "gear" },
   ];
   const navPrem = [
+    { id: "subscricoes", label: "Subscrições", icon: "tv" },
     { id: "lembretes", label: "Lembretes", icon: "bell" },
     { id: "recorrentes", label: "Recorrentes", icon: "repeat" },
     { id: "partilha", label: "Partilha", icon: "users" },
@@ -145,7 +146,7 @@ function MobileNav({ route, go, onMore }) {
     { id: "rendimentos", label: "Receita", icon: "coins" },
     { id: "perfil", label: "Perfil", icon: "user" },
   ];
-  const moreRoutes = ["poupanca", "relatorios", "historico", "config", "lembretes", "recorrentes", "partilha", "previsao", "premium"];
+  const moreRoutes = ["poupanca", "relatorios", "historico", "config", "subscricoes", "lembretes", "recorrentes", "partilha", "previsao", "premium"];
   return (
     <nav className="mobilenav">
       {tabs.map((t) => (
@@ -166,6 +167,7 @@ function MoreSheet({ route, go, onClose, theme, setTheme, onLogout }) {
   const tr = useT();
   const items = [
     { id: "poupanca", label: "Poupança", icon: "target" },
+    { id: "subscricoes", label: "Subscrições", icon: "tv" },
     { id: "lembretes", label: "Lembretes", icon: "bell" },
     { id: "recorrentes", label: "Recorrentes", icon: "repeat" },
     { id: "partilha", label: "Partilha", icon: "users" },

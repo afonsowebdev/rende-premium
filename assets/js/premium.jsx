@@ -6,7 +6,7 @@ const PremiumStore = (function () {
   let email = "anon";
   let state = null;
   const subs = new Set();
-  const DEF = { premium: true, plano: "month", lembretes: [], recorrentes: [], grupos: [] };
+  const DEF = { premium: true, plano: "month", lembretes: [], recorrentes: [], grupos: [], subscricoes: [], pagosSub: {} };
   const KEY = () => "rende_premium_" + email;
   const read = () => { try { return { ...DEF, ...(JSON.parse(localStorage.getItem(KEY()) || "{}")) }; } catch (e) { return { ...DEF }; } };
   const persist = () => { try { localStorage.setItem(KEY(), JSON.stringify(state)); } catch (e) {} };
@@ -589,6 +589,156 @@ function PrevisaoInner() {
 }
 
 /* pequeno selo Premium para a navegação */
+/* ---------------- Subscrições (streaming & contas mensais) ---------------- */
+/* Catálogo de serviços comuns. Os valores são apenas sugestões iniciais —
+   o utilizador ajusta ao seu plano. Usamos ícones genéricos (não logótipos). */
+const SUB_CATALOGO = [
+  { nome: "Netflix", icon: "film", color: "#e50914", valor: 13.99 },
+  { nome: "Disney+", icon: "film", color: "#1f6feb", valor: 9.99 },
+  { nome: "HBO Max", icon: "film", color: "#7b4dff", valor: 9.99 },
+  { nome: "Prime Video", icon: "film", color: "#00a8e1", valor: 6.99 },
+  { nome: "Apple TV+", icon: "tv", color: "#787880", valor: 9.99 },
+  { nome: "YouTube Premium", icon: "film", color: "#ff0000", valor: 12.99 },
+  { nome: "Spotify", icon: "music", color: "#1db954", valor: 6.99 },
+  { nome: "Apple Music", icon: "music", color: "#fa2d48", valor: 10.99 },
+  { nome: "YouTube Music", icon: "music", color: "#e53935", valor: 10.99 },
+  { nome: "Tidal", icon: "music", color: "#22c1e8", valor: 10.99 },
+  { nome: "Deezer", icon: "music", color: "#a238ff", valor: 11.99 },
+  { nome: "iCloud+", icon: "wifi", color: "#3693f3", valor: 0.99 },
+  { nome: "Google One", icon: "wifi", color: "#4285f4", valor: 1.99 },
+  { nome: "Dropbox", icon: "wifi", color: "#0061ff", valor: 11.99 },
+  { nome: "Microsoft 365", icon: "briefcase", color: "#d83b01", valor: 7.00 },
+  { nome: "PlayStation Plus", icon: "game", color: "#0070d1", valor: 8.99 },
+  { nome: "Xbox Game Pass", icon: "game", color: "#107c10", valor: 12.99 },
+  { nome: "Twitch", icon: "tv", color: "#9146ff", valor: 4.99 },
+  { nome: "ChatGPT Plus", icon: "spark", color: "#10a37f", valor: 23.00 },
+  { nome: "Notion", icon: "briefcase", color: "#787880", valor: 9.50 },
+  { nome: "Amazon Prime", icon: "bag", color: "#00a8e1", valor: 4.99 },
+];
+
+function SubModal({ mesAtual, onClose, onSave }) {
+  const [base, setBase] = React.useState(null); // null = ainda a escolher do catálogo
+  const [f, setF] = React.useState({ nome: "", valor: "", dia: 1, icon: "tv", color: "var(--accent)" });
+  const [err, setErr] = React.useState("");
+  const escolher = (c) => { setBase(c); setF({ nome: c.nome, valor: String(c.valor).replace(".", ","), dia: 1, icon: c.icon, color: c.color }); setErr(""); };
+  const outra = () => { setBase({ nome: "" }); setF({ nome: "", valor: "", dia: 1, icon: "spark", color: "var(--accent)" }); setErr(""); };
+  const guardar = () => {
+    if (!f.nome.trim()) return setErr("Dá um nome à subscrição.");
+    if (numOf(f.valor) <= 0) return setErr("Indica um valor válido.");
+    onSave({ nome: f.nome.trim(), valor: numOf(f.valor), dia: Math.min(28, Math.max(1, +f.dia || 1)), icon: f.icon, color: f.color, desde: mesAtual });
+  };
+
+  if (base === null) {
+    return (
+      <Modal title="Adicionar subscrição" onClose={onClose}
+        footer={<button className="btn btn-ghost" onClick={onClose}>Cancelar</button>}>
+        <p className="muted" style={{ fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>Escolhe um serviço (ajustas o valor a seguir) ou cria um à medida.</p>
+        <div className="sub-grid">
+          {SUB_CATALOGO.map((c) => (
+            <button key={c.nome} className="sub-pick" onClick={() => escolher(c)}>
+              <span className="sub-pick-ico" style={{ background: `color-mix(in srgb, ${c.color} 16%, transparent)` }}><Icon name={c.icon} size={18} color={c.color} /></span>
+              <span className="sub-pick-n">{c.nome}</span>
+            </button>
+          ))}
+          <button className="sub-pick" onClick={outra}>
+            <span className="sub-pick-ico" style={{ background: "var(--surface-2)" }}><Icon name="plus" size={18} color="var(--ink-2)" /></span>
+            <span className="sub-pick-n">Outra…</span>
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title={base.nome || "Nova subscrição"} onClose={onClose}
+      footer={<><button className="btn btn-ghost" onClick={() => setBase(null)}>Voltar</button><button className="btn btn-primary" onClick={guardar}><Icon name="check" size={14} color="#fff" /> Adicionar</button></>}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Field label="Nome"><input className="input" autoFocus value={f.nome} onChange={(e) => setF((s) => ({ ...s, nome: e.target.value }))} placeholder="Ex: Netflix" /></Field>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Valor / mês" hint="Ajusta ao teu plano."><input className="input" inputMode="decimal" value={f.valor} onChange={(e) => setF((s) => ({ ...s, valor: e.target.value }))} placeholder="0,00" /></Field>
+          <Field label="Dia de pagamento"><input className="input" type="number" min="1" max="28" value={f.dia} onChange={(e) => setF((s) => ({ ...s, dia: e.target.value }))} /></Field>
+        </div>
+        {err && <div className="alert bad" style={{ padding: "9px 12px" }}><Icon name="info" size={16} color="var(--neg)" /><span style={{ fontSize: 12.5, fontWeight: 700 }}>{err}</span></div>}
+      </div>
+    </Modal>
+  );
+}
+
+function Subscricoes() { return <PremiumGate><SubscricoesInner /></PremiumGate>; }
+function SubscricoesInner() {
+  const fin = useFinance();
+  const prem = usePremium();
+  const mes = fin.month; // "AAAA-MM" — o mês selecionado no topo
+  const todas = prem.get().subscricoes || [];
+  const pagos = prem.get().pagosSub || {};
+  const [modal, setModal] = React.useState(false);
+
+  // só mostra as subscrições já existentes neste mês (a partir do mês em que foram criadas)
+  const ativas = [...todas].filter((s) => !s.desde || s.desde <= mes).sort((a, b) => (a.dia || 0) - (b.dia || 0));
+  const isPago = (id) => !!(pagos[id] && pagos[id][mes]);
+  const togglePago = (id) => {
+    const cur = prem.get().pagosSub || {};
+    const ms = { ...(cur[id] || {}) };
+    if (ms[mes]) delete ms[mes]; else ms[mes] = true;
+    prem.update({ pagosSub: { ...cur, [id]: ms } });
+  };
+  const apagar = (id) => {
+    const cur = prem.get().pagosSub || {};
+    if (cur[id]) { const c2 = { ...cur }; delete c2[id]; prem.update({ pagosSub: c2 }); }
+    prem.remove("subscricoes", id);
+  };
+
+  const total = ativas.reduce((s, x) => s + (+x.valor || 0), 0);
+  const nPagas = ativas.filter((s) => isPago(s.id)).length;
+  const pagoTotal = ativas.filter((s) => isPago(s.id)).reduce((s, x) => s + (+x.valor || 0), 0);
+  const falta = total - pagoTotal;
+
+  return (
+    <div className="content">
+      <PremActions label="Adicionar subscrição" onAdd={() => setModal(true)} />
+      {ativas.length === 0 ? (
+        <EmptyState icon="tv" title="Sem subscrições neste mês" msg="Adiciona as tuas subscrições (Netflix, Spotify, iCloud…), define o valor e o dia, e marca cada mês o que já pagaste."
+          action={<button className="btn btn-primary" onClick={() => setModal(true)}><Icon name="plus" size={16} color="#fff" /> Adicionar subscrição</button>} />
+      ) : (
+        <>
+          <div className="prem-stats">
+            <div className="prem-stat"><span className="prem-stat-l">Total do mês</span><span className="prem-stat-v tnum">{BM.eur(total)}</span><span className="prem-stat-s">{ativas.length} subscriç{ativas.length === 1 ? "ão" : "ões"}</span></div>
+            <div className="prem-stat ok"><span className="prem-stat-l">Já pago</span><span className="prem-stat-v tnum">{BM.eur(pagoTotal)}</span><span className="prem-stat-s">{nPagas} marcada{nPagas === 1 ? "" : "s"}</span></div>
+            <div className={"prem-stat" + (falta > 0 ? " danger" : "")}><span className="prem-stat-l">Falta pagar</span><span className="prem-stat-v tnum">{BM.eur(falta)}</span><span className="prem-stat-s">{ativas.length - nPagas} por pagar</span></div>
+          </div>
+
+          <div className="card card-pad">
+            {ativas.map((s) => {
+              const pago = isPago(s.id);
+              const cor = s.color || "var(--accent)";
+              return (
+                <div className={"prem-row" + (pago ? " is-paid" : "")} key={s.id}>
+                  <span className="prem-rico" style={{ background: `color-mix(in srgb, ${cor} 14%, transparent)` }}><Icon name={s.icon || "tv"} size={18} color={cor} /></span>
+                  <div className="prem-rtxt">
+                    <b style={pago ? { opacity: .55 } : null}>{s.nome}</b>
+                    <span className="muted" style={{ fontSize: 12.5 }}>Todos os dias {s.dia}{pago ? " · pago ✓" : ""}</span>
+                  </div>
+                  <div className="prem-ramt" style={pago ? { opacity: .55 } : null}>{BM.eur(s.valor)}</div>
+                  <div className="prem-rbtns">
+                    <button className={"sub-check" + (pago ? " on" : "")} title={pago ? "Marcar como por pagar" : "Marcar como pago"} onClick={() => togglePago(s.id)}>
+                      <Icon name="check" size={15} color={pago ? "#fff" : "var(--ink-3)"} />
+                    </button>
+                    <button className="icon-btn" title="Apagar subscrição" onClick={() => apagar(s.id)}><Icon name="trash" size={16} color="var(--neg)" /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="tiny muted" style={{ textAlign: "center", marginTop: 14, fontWeight: 600, lineHeight: 1.5 }}>
+            Muda o mês nas setas lá em cima para marcares pagamentos de meses anteriores. Cada mês guarda as suas próprias marcas.
+          </p>
+        </>
+      )}
+      {modal && <SubModal mesAtual={mes} onClose={() => setModal(false)} onSave={(it) => { prem.add("subscricoes", it); setModal(false); }} />}
+    </div>
+  );
+}
+
 function PremiumBadge() {
   const prem = usePremium();
   if (!prem.get().premium) return null;

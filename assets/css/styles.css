@@ -878,3 +878,23 @@ input.range::-moz-range-thumb { width: 19px; height: 19px; border-radius: 50%; b
 .kpidet-chart { display: flex; justify-content: center; padding: 6px 0 2px; }
 .kpidet-hi { text-align: center; font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .kpi-label { display: inline-flex; align-items: center; gap: 5px; }
+
+/* ===== Subscrições (premium) ===== */
+.prem-stat.ok .prem-stat-v { color: var(--accent); }
+.prem-row.is-paid .prem-rtxt b { text-decoration: none; }
+
+/* botão circular de marcar pago */
+.sub-check { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--border-strong);
+  background: var(--surface); display: grid; place-items: center; cursor: pointer; flex: none;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+.sub-check:hover { border-color: var(--accent); transform: translateY(-1px); }
+.sub-check.on { background: var(--accent); border-color: var(--accent); }
+
+/* grelha do catálogo de serviços no modal */
+.sub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sub-pick { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; text-align: left;
+  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; min-width: 0; }
+.sub-pick:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.sub-pick-ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex: none; }
+.sub-pick-n { font-size: 13.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
