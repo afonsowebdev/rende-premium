@@ -309,10 +309,24 @@ function Dashboard({ go, open }) {
   const hasData = fin.despMes.length > 0 || fin.rendMes.length > 0;
   const orc = fin.data.orcamento;
   const pctGasto = orc ? Math.round((fin.totalGasto / orc) * 100) : null;
-  const recent = [...fin.despMes].sort((a, b) => (b.data || "").localeCompare(a.data || "")).slice(0, 6);
-  const recSpark = fin.series.map((m) => m.rec);
-  const gastoSpark = fin.series.map((m) => m.gasto);
-  const taxaPoup = fin.totalRec > 0 ? Math.round((fin.saldo / fin.totalRec) * 100) : 0;
+  const recent = [
+    ...fin.despMes.map((d) => ({ ...d, _rec: false })),
+    ...fin.rendMes.map((d) => ({ ...d, _rec: true })),
+  ].sort((a, b) => (b.data || "").localeCompare(a.data || "")).slice(0, 5);
+  const S = fin.series || [];
+  const _cur = S[S.length - 1] || {}, _prev = S[S.length - 2] || {};
+  const pctDelta = (a, b) => (b ? Math.round(((a - b) / Math.abs(b)) * 1000) / 10 : null);
+  const dRec = pctDelta(_cur.rec, _prev.rec);
+  const dGasto = pctDelta(_cur.gasto, _prev.gasto);
+  const dSaldo = pctDelta((_cur.rec || 0) - (_cur.gasto || 0), (_prev.rec || 0) - (_prev.gasto || 0));
+  const metasAll = fin.data.metas || [];
+  const metasDone = metasAll.filter((m) => m.atual >= m.alvo).length;
+  const metasPct = metasAll.length ? Math.round((metasDone / metasAll.length) * 100) : 0;
+  const deltaTxt = (d) => (<>{Math.abs(d).toLocaleString("pt-PT")}% <span className="muted" style={{ fontWeight: 600 }}>vs. mês passado</span></>);
+  const colorOfCat = (key) => (BM.cats[key] && BM.cats[key].color) || (((fin.data.customCats || []).find((c) => c.key === key) || {}).color) || "var(--c-outros)";
+  const cats = (fin.catBreak || []).slice(0, 6);
+  const catTotal = (fin.catBreak || []).reduce((s, c) => s + c.valor, 0) || 1;
+  const donutData = cats.map((c) => ({ valor: c.valor, color: colorOfCat(c.key), nome: tcat(c.key) }));
 
   if (!hasData) {
     return (
@@ -340,73 +354,76 @@ function Dashboard({ go, open }) {
     );
   }
 
-  const alerts = [];
-  if (pctGasto != null && pctGasto >= 80) alerts.push(["warn", "bell", tt("dash_alert_budget_t", { pct: pctGasto }), tt("dash_alert_budget_d", { x: BM.eur(Math.max(0, orc - fin.totalGasto)), y: BM.eur0(orc) })]);
-  if (fin.saldo < 0) alerts.push(["bad", "info", tr("dash_alert_neg_t"), tt("dash_alert_neg_d", { x: BM.eur(-fin.saldo) })]);
-  else if (taxaPoup >= 10) alerts.push(["ok", "target", tt("dash_alert_save_t", { pct: taxaPoup }), tr("dash_alert_save_d")]);
-  const nearMeta = fin.data.metas.find((m) => m.atual / m.alvo >= 0.7 && m.atual < m.alvo);
-  if (nearMeta) alerts.push(["ok", "target", tt("dash_alert_meta_t", { nome: nearMeta.nome }), tt("dash_alert_meta_d", { x: BM.eur0(nearMeta.alvo - nearMeta.atual) })]);
-
   return (
     <div className="content">
-      {alerts.length > 0 && (
-        <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(3, alerts.length)},1fr)` }}>
-          {alerts.slice(0, 3).map((a, i) => <Alert key={i} kind={a[0]} icon={a[1]} title={a[2]}>{a[3]}</Alert>)}
-        </div>
-      )}
-
-      <div className="grid" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
-        <Kpi label={tr("kpi_received")} value={BM.eur0(fin.totalRec)} icon="arrowsDown" color="var(--accent)" spark={recSpark} onClick={() => setDetalhe("rec")} />
-        <Kpi label={tr("kpi_spent")} value={BM.eur0(fin.totalGasto)} icon="wallet" color="var(--c-transporte)" spark={gastoSpark} onClick={() => setDetalhe("gasto")} />
-        <Kpi label={tr("kpi_available")} value={BM.eur0(fin.disponivel)} icon="bolt" color={fin.disponivel < 0 ? "var(--neg)" : "var(--c-habitacao)"} sub={fin.poupancaSeparada > 0 ? tt("kpi_after_savings", { x: BM.eur0(fin.poupancaSeparada) }) : tr("kpi_until_eom")} />
-        <Kpi label={tr("kpi_saved")} value={BM.eur0(fin.poupado)} icon="target" color="var(--c-educacao)" sub={tt(fin.data.metas.length === 1 ? "kpi_meta_one" : "kpi_meta_many", { n: fin.data.metas.length })} />
+      <div className="grid kpi5" style={{ gridTemplateColumns: "repeat(5,1fr)" }}>
+        <Kpi label="Saldo atual" value={BM.eur(fin.saldo)} icon="wallet" color="var(--accent)" delta={dSaldo == null ? null : deltaTxt(dSaldo)} deltaDir={dSaldo < 0 ? "down" : "up"} />
+        <Kpi label={tr("kpi_received")} value={BM.eur(fin.totalRec)} icon="coins" color="var(--pos)" delta={dRec == null ? null : deltaTxt(dRec)} deltaDir={dRec < 0 ? "down" : "up"} onClick={() => setDetalhe("rec")} />
+        <Kpi label={tr("kpi_spent")} value={BM.eur(fin.totalGasto)} icon="cart" color="var(--neg)" delta={dGasto == null ? null : deltaTxt(dGasto)} deltaDir={dGasto < 0 ? "down" : "up"} onClick={() => setDetalhe("gasto")} />
+        <Kpi label="Poupança do mês" value={BM.eur(fin.poupado)} icon="trend" color="var(--c-educacao)" delta={dSaldo == null ? null : deltaTxt(dSaldo)} deltaDir={dSaldo < 0 ? "down" : "up"} />
+        <Kpi label="Metas concluídas" value={metasDone + " / " + metasAll.length} icon="target" color="var(--warn)"
+          sub={<><div style={{ marginBottom: 8 }}>{metasPct}% do total</div><Progress value={metasDone} max={Math.max(metasAll.length, 1)} color="var(--warn)" /></>} />
       </div>
       {detalhe && <KpiDetalheModal tipo={detalhe === "gasto" ? "gasto" : "rec"} fin={fin} onClose={() => setDetalhe(null)} />}
 
-      <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+      <div className="grid dash-mid" style={{ gridTemplateColumns: "1.5fr 1.25fr 1fr" }}>
         <div className="card card-pad">
           <div className="section-head" style={{ marginBottom: 14 }}>
-            <div><div className="section-title">{tr("dash_evolution")}</div><div className="tiny muted" style={{ fontWeight: 600, marginTop: 2 }}>{tr("dash_evolution_sub")}</div></div>
+            <div className="section-title">{tr("dash_evolution")}</div>
             <div className="row tiny" style={{ fontWeight: 700 }}>
               <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: "var(--accent)" }} /> {tr("legend_received")}</span>
               <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: "var(--c-transporte)" }} /> {tr("legend_spent")}</span>
             </div>
           </div>
-          <LineChart data={fin.series} height={216} />
+          <LineChart data={fin.series} height={232} />
         </div>
+
         <div className="card card-pad">
-          <div className="section-head" style={{ marginBottom: 16 }}>
-            <div className="section-title">{tr("dash_by_category")}</div>
-            <span className="tnum" style={{ fontWeight: 700, fontSize: 15 }}>{BM.eur0(fin.totalGasto)}</span>
-          </div>
-          {fin.catBreak.length === 0 ? (
+          <div className="section-head" style={{ marginBottom: 14 }}><div className="section-title">{tr("dash_by_category")}</div></div>
+          {donutData.length === 0 ? (
             <div style={{ display: "grid", placeItems: "center", height: 200, textAlign: "center" }} className="muted tiny">
               <div><Icon name="cart" size={26} color="var(--ink-3)" /><div style={{ marginTop: 8, fontWeight: 600 }}>{tr("dash_no_expenses")}</div></div>
             </div>
           ) : (
-            <BarBreakdown data={fin.catBreak.slice(0, 7)} money={BM.eur0} labelOf={(c) => tcat(c.key)} />
+            <div className="row" style={{ gap: 16, alignItems: "center" }}>
+              <DonutChart data={donutData} size={154} thickness={24}
+                center={<div><div className="tnum" style={{ fontWeight: 800, fontSize: 15.5 }}>{BM.eur0(fin.totalGasto)}</div><div className="tiny muted" style={{ fontWeight: 600 }}>Total</div></div>} />
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                {cats.map((c) => (
+                  <div className="row" key={c.key} style={{ gap: 9, fontSize: 12.5 }}>
+                    <span className="dot" style={{ background: colorOfCat(c.key) }} />
+                    <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>{tcat(c.key)}</span>
+                    <span className="tnum" style={{ marginLeft: "auto", fontWeight: 700 }}>{BM.eur0(c.valor)}</span>
+                    <span className="muted" style={{ fontWeight: 700, width: 30, textAlign: "right", fontSize: 12 }}>{Math.round((c.valor / catTotal) * 100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
-      </div>
 
-      <div className="card card-pad">
-        <div className="section-head" style={{ marginBottom: 10 }}>
-          <div><div className="section-title">{tr("dash_savings_evo")}</div><div className="tiny muted" style={{ fontWeight: 600, marginTop: 2 }}>{tr("dash_savings_evo_sub")}</div></div>
-          <div style={{ textAlign: "right" }}>
-            <div className="tnum" style={{ fontWeight: 700, fontSize: 18, color: "var(--c-educacao)" }}>{BM.eur0(fin.poupado)}</div>
-            <div className="tiny muted" style={{ fontWeight: 700 }}>{tr("kpi_saved")}</div>
+        <div className="card card-pad">
+          <div className="section-head" style={{ marginBottom: 6 }}><div className="section-title">As minhas metas</div>
+            <button className="btn btn-soft" style={{ padding: "5px 10px" }} onClick={() => go("poupanca")}>{tr("see_all")}</button>
           </div>
+          {metasAll.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600, padding: "16px 0" }}>{tr("goals_empty")}</div> :
+            metasAll.slice(0, 4).map((m) => {
+              const pct = Math.min(100, Math.round((m.atual / m.alvo) * 100));
+              return (
+                <div key={m.id} style={{ padding: "11px 0", borderTop: "1px solid var(--border)" }}>
+                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13.5 }}>{m.nome}</span>
+                    <span className="tnum tiny" style={{ fontWeight: 800 }}>{pct}%</span>
+                  </div>
+                  <div className="tnum tiny muted" style={{ fontWeight: 600, marginBottom: 7 }}>{BM.eur0(m.atual)} / {BM.eur0(m.alvo)}</div>
+                  <Progress value={m.atual} max={m.alvo} color={m.cor} />
+                </div>
+              );
+            })}
         </div>
-        {(fin.poupado === 0 && fin.series.every((s) => !s.poupAcum)) ? (
-          <div style={{ display: "grid", placeItems: "center", height: 150, textAlign: "center" }} className="muted tiny">
-            <div><Icon name="target" size={26} color="var(--ink-3)" /><div style={{ marginTop: 8, fontWeight: 600 }}>{tr("dash_no_savings")}</div></div>
-          </div>
-        ) : (
-          <SavingsArea data={fin.series} />
-        )}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+      <div className="grid dash-bot" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
         <div className="card card-pad">
           <div className="section-head" style={{ marginBottom: 6 }}>
             <div className="section-title">{tr("dash_recent")}</div>
@@ -415,45 +432,47 @@ function Dashboard({ go, open }) {
           {recent.length === 0 ? <div className="muted tiny" style={{ padding: "24px 0", fontWeight: 600 }}>{tr("dash_no_expenses")}.</div> : (
             <div className="list">
               {recent.map((d) => (
-                <div className="li" key={d.id}>
-                  <CatBadge catKey={d.cat} />
+                <div className="li" key={(d._rec ? "r" : "d") + d.id}>
+                  {d._rec
+                    ? <div className="li-ico" style={{ background: "color-mix(in srgb, var(--pos) 15%, transparent)" }}><Icon name="coins" size={19} color="var(--pos)" /></div>
+                    : <CatBadge catKey={d.cat} />}
                   <div className="li-main">
-                    <div className="li-title">{d.nome}</div>
-                    <div className="li-sub">{tcat(d.cat)} · {BM.fmtData(d.data)} · {d.tipo === "fixa" ? tr("fixed") : tr("variable")}</div>
+                    <div className="li-title">{d.nome || d.fonte || tr("kpi_received")}</div>
+                    <div className="li-sub">{d._rec ? tr("kpi_received") : tcat(d.cat)} · {BM.fmtData(d.data)}</div>
                   </div>
-                  <div className="li-amt tnum" style={{ color: "var(--neg)" }}>−{BM.eur(d.valor)}</div>
+                  <div className="li-amt tnum" style={{ color: d._rec ? "var(--pos)" : "var(--neg)" }}>{d._rec ? "" : "−"}{BM.eur(d.valor)}</div>
                 </div>
               ))}
             </div>
           )}
         </div>
-        <div className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="section-head"><div className="section-title">{tr("dash_budget")}</div>
+
+        <div className="card card-pad">
+          <div className="section-head" style={{ marginBottom: 14 }}><div className="section-title">{tr("dash_budget")}</div>
             <button className="btn btn-soft" style={{ padding: "5px 10px" }} onClick={() => open("orcamento")}><Icon name="edit" size={13} /> {tr("define")}</button>
           </div>
           {orc ? (
-            <div>
+            <>
               <div className="row" style={{ justifyContent: "space-between", marginBottom: 9 }}>
-                <span className="tnum" style={{ fontWeight: 700, fontSize: 18 }}>{BM.eur0(fin.totalGasto)}</span>
-                <span className="muted tiny" style={{ fontWeight: 700 }}>{tt("of_amount", { x: BM.eur0(orc) })}</span>
+                <span><b className="tnum" style={{ fontSize: 17, fontWeight: 800 }}>{BM.eur0(fin.totalGasto)}</b> <span className="muted tiny" style={{ fontWeight: 600 }}>{tt("of_amount", { x: BM.eur0(orc) })}</span></span>
+                <span className="tnum" style={{ fontWeight: 800 }}>{pctGasto}%</span>
               </div>
               <Progress value={fin.totalGasto} max={orc} color={pctGasto > 80 ? "var(--warn)" : "var(--accent)"} />
-              <div className="tiny muted" style={{ marginTop: 9, fontWeight: 600 }}>{tt("budget_left", { x: BM.eur(Math.max(0, orc - fin.totalGasto)), pct: pctGasto })}</div>
-            </div>
-          ) : <div className="muted tiny" style={{ fontWeight: 600 }}>{tr("budget_empty")}</div>}
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 13 }}>
-            <div className="tiny" style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-3)" }}>{tr("goals_label")}</div>
-            {fin.data.metas.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>{tr("goals_empty")} <button onClick={() => go("poupanca")} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 700, cursor: "pointer", padding: 0, font: "inherit" }}>{tr("goals_create_first")}</button></div> :
-              fin.data.metas.map((m) => (
-                <div key={m.id}>
-                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 7 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{m.nome}</span>
-                    <span className="tnum tiny muted" style={{ fontWeight: 700 }}>{BM.eur0(m.atual)} / {BM.eur0(m.alvo)}</span>
+              <div style={{ marginTop: 14 }}>
+                {cats.map((c) => (
+                  <div className="row" key={c.key} style={{ gap: 12, padding: "11px 0", borderTop: "1px solid var(--border)" }}>
+                    <CatBadge catKey={c.key} size={34} r={10} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{tcat(c.key)}</div>
+                      <Progress value={c.valor} max={catTotal} color={colorOfCat(c.key)} />
+                    </div>
+                    <span className="muted tiny tnum" style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{BM.eur0(c.valor)}</span>
+                    <span className="tnum tiny" style={{ fontWeight: 800, width: 40, textAlign: "right" }}>{Math.round((c.valor / catTotal) * 100)}%</span>
                   </div>
-                  <Progress value={m.atual} max={m.alvo} color={m.cor} />
-                </div>
-              ))}
-          </div>
+                ))}
+              </div>
+            </>
+          ) : <div className="muted tiny" style={{ fontWeight: 600 }}>{tr("budget_empty")}</div>}
         </div>
       </div>
     </div>
