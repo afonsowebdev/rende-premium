@@ -342,24 +342,44 @@ function RecorrentesInner() {
 }
 
 /* ---------------- Partilha (orçamentos partilhados) ---------------- */
+const nomeDeEmail = (e) => { const p = ((e || "").split("@")[0] || "").replace(/[._-]/g, " "); return p.split(" ").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : "")).join(" ").trim() || e; };
 function GrupoModal({ onClose, onSave }) {
   const [nome, setNome] = React.useState("");
-  const [membros, setMembros] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [convidados, setConvidados] = React.useState([]); // [{ email, nome }]
   const [err, setErr] = React.useState("");
+  const addConvidado = () => {
+    const v = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(v)) return setErr("Escreve um email válido.");
+    if (convidados.some((c) => c.email === v)) return setErr("Esse email já foi adicionado.");
+    setConvidados((a) => [...a, { email: v, nome: nomeDeEmail(v) }]); setEmail(""); setErr("");
+  };
   const guardar = () => {
     if (!nome.trim()) return setErr("Dá um nome ao grupo.");
-    const lista = membros.split(",").map((m) => m.trim()).filter(Boolean);
-    if (lista.length === 0) return setErr("Adiciona pelo menos uma pessoa.");
-    onSave({ nome: nome.trim(), membros: lista, despesas: [] });
+    const membros = convidados.map((c) => c.nome);
+    const convites = convidados.map((c) => ({ email: c.email, nome: c.nome, estado: "pendente" }));
+    onSave({ nome: nome.trim(), membros, convites, despesas: [] });
   };
   return (
     <Modal title="Novo grupo" onClose={onClose}
       footer={<><button className="btn btn-ghost" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={guardar}><Icon name="check" size={14} color="#fff" /> Criar grupo</button></>}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Field label="Nome do grupo"><input className="input" autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Casa do Porto, Viagem…" /></Field>
-        <Field label="Membros" hint="Separa por vírgulas. Tu (Eu) já estás incluído.">
-          <input className="input" value={membros} onChange={(e) => setMembros(e.target.value)} placeholder="Ana, João, Rita" />
+        <Field label="Convidar por email" hint="Adiciona um de cada vez. Tu (Eu) já estás incluído.">
+          <div className="row" style={{ gap: 8 }}>
+            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addConvidado(); } }} placeholder="email@exemplo.com" />
+            <button type="button" className="btn btn-soft" style={{ flex: "none" }} onClick={addConvidado}><Icon name="plus" size={14} /> Adicionar</button>
+          </div>
         </Field>
+        {convidados.length > 0 && (
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            {convidados.map((c) => (
+              <span key={c.email} className="chip" style={{ gap: 7 }}>{c.nome}
+                <button type="button" onClick={() => setConvidados((a) => a.filter((x) => x.email !== c.email))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", color: "var(--ink-3)" }}><span style={{ transform: "rotate(45deg)", display: "grid" }}><Icon name="plus" size={13} color="var(--ink-3)" /></span></button>
+              </span>
+            ))}
+          </div>
+        )}
         {err && <div className="alert bad" style={{ padding: "9px 12px" }}><Icon name="info" size={16} color="var(--neg)" /><span style={{ fontSize: 12.5, fontWeight: 700 }}>{err}</span></div>}
       </div>
     </Modal>
@@ -377,7 +397,7 @@ function DespesaPartilhadaModal({ grupo, onClose, onSave }) {
     if (!f.titulo.trim()) return setErr("Dá um nome à despesa.");
     if (numOf(f.valor) <= 0) return setErr("Indica um valor válido.");
     if (parts.length === 0) return setErr("Escolhe quem divide a despesa.");
-    onSave({ id: BM.uid(), titulo: f.titulo.trim(), valor: numOf(f.valor), data: f.data, pagador: f.pagador, participantes: parts });
+    onSave({ id: BM.uid(), titulo: f.titulo.trim(), valor: numOf(f.valor), data: f.data, pagador: f.pagador, participantes: parts, pagamentos: {} });
   };
   return (
     <Modal title="Nova despesa" sub={grupo.nome} onClose={onClose}
@@ -408,9 +428,15 @@ function balancos(g) {
   (g.despesas || []).forEach((e) => {
     const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
     const share = (+e.valor || 0) / parts.length;
+    const pagos = e.pagamentos || {};
     if (net[e.pagador] == null) net[e.pagador] = 0;
-    net[e.pagador] += (+e.valor || 0);
-    parts.forEach((p) => { if (net[p] == null) net[p] = 0; net[p] -= share; });
+    parts.forEach((p) => {
+      if (net[p] == null) net[p] = 0;
+      if (p === e.pagador) return;   // o pagador não deve a si próprio
+      if (pagos[p]) return;          // já acertou esta despesa — sai do saldo
+      net[p] -= share;               // deve a sua parte
+      net[e.pagador] += share;       // o pagador tem essa parte a receber
+    });
   });
   Object.keys(net).forEach((p) => (net[p] = Math.round(net[p] * 100) / 100));
   return net;
@@ -428,6 +454,8 @@ function PartilhaInner() {
   const [modal, setModal] = React.useState(false);
   const [despModal, setDespModal] = React.useState(null);
   const [openId, setOpenId] = React.useState(null);
+  const [delId, setDelId] = React.useState(null);
+  const [convEmail, setConvEmail] = React.useState("");
   const aberto = grupos.find((g) => g.id === openId);
 
   if (aberto) {
@@ -458,16 +486,57 @@ function PartilhaInner() {
           ))}
         </div>
         <div className="card card-pad">
+          <div className="prem-sec-t">Membros</div>
+          <div className="prem-balrow">
+            <span className="prem-avatar">Eu</span>
+            <span style={{ flex: 1, fontWeight: 700 }}>Eu <span className="muted tiny" style={{ fontWeight: 600 }}>(tu)</span></span>
+            <span className="prem-bal-tag zero">ativo</span>
+          </div>
+          {(aberto.membros || []).map((m) => {
+            const conv = (aberto.convites || []).find((c) => c.nome === m);
+            const pend = conv && conv.estado === "pendente";
+            return (
+              <div className="prem-balrow" key={m}>
+                <span className="prem-avatar">{inicial(m)}</span>
+                <span style={{ flex: 1, fontWeight: 700 }}>{m}{conv ? <span className="muted tiny" style={{ fontWeight: 600 }}> · {conv.email}</span> : null}</span>
+                {pend
+                  ? <button className="btn btn-soft" style={{ padding: "4px 10px" }} onClick={() => prem.edit("grupos", aberto.id, { convites: (aberto.convites || []).map((c) => (c.nome === m ? { ...c, estado: "ativo" } : c)) })}>Aceitar convite</button>
+                  : <span className="prem-bal-tag zero">ativo</span>}
+              </div>
+            );
+          })}
+          <div className="row" style={{ gap: 8, marginTop: 12 }}>
+            <input className="input" type="email" value={convEmail} onChange={(e) => setConvEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = convEmail.trim().toLowerCase(); if (/^\S+@\S+\.\S+$/.test(v)) { const nm = nomeDeEmail(v); if (!(aberto.membros || []).includes(nm)) prem.edit("grupos", aberto.id, { membros: [...(aberto.membros || []), nm], convites: [...(aberto.convites || []), { email: v, nome: nm, estado: "pendente" }] }); setConvEmail(""); } } }}
+              placeholder="convidar por email…" />
+            <button className="btn btn-primary" style={{ flex: "none" }} onClick={() => { const v = convEmail.trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(v)) return; const nm = nomeDeEmail(v); if (!(aberto.membros || []).includes(nm)) prem.edit("grupos", aberto.id, { membros: [...(aberto.membros || []), nm], convites: [...(aberto.convites || []), { email: v, nome: nm, estado: "pendente" }] }); setConvEmail(""); }}><Icon name="plus" size={14} color="#fff" /> Convidar</button>
+          </div>
+          <div className="muted tiny" style={{ fontWeight: 600, marginTop: 8 }}>Simulação local: o convite real por email (com link) entra na fase de unificação do backend.</div>
+        </div>
+        <div className="card card-pad">
           <div className="prem-sec-t">Despesas</div>
           {desp.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>Ainda sem despesas. Adiciona a primeira.</div> :
             desp.map((e) => {
               const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
+              const pagos = e.pagamentos || {};
+              const devedores = parts.filter((p) => p !== e.pagador);
               return (
-                <div className="prem-row" key={e.id}>
-                  <span className="prem-rico sm"><Icon name="receipt" size={17} color="var(--ink-2)" /></span>
-                  <div className="prem-rtxt"><b>{e.titulo}</b><span className="muted" style={{ fontSize: 12 }}>{e.data ? BM.fmtData(e.data) + " · " : ""}Pagou {e.pagador} · ÷ {parts.length} = {BM.eur((+e.valor || 0) / parts.length)}</span></div>
-                  <div className="prem-ramt">{BM.eur(e.valor)}</div>
-                  <div className="prem-rbtns"><button className="icon-btn" title="Apagar despesa" onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).filter((x) => x.id !== e.id) })}><Icon name="trash" size={15} color="var(--neg)" /></button></div>
+                <div key={e.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <div className="prem-row" style={{ borderBottom: "none" }}>
+                    <span className="prem-rico sm"><Icon name="receipt" size={17} color="var(--ink-2)" /></span>
+                    <div className="prem-rtxt"><b>{e.titulo}</b><span className="muted" style={{ fontSize: 12 }}>{e.data ? BM.fmtData(e.data) + " · " : ""}Pagou {e.pagador} · ÷ {parts.length} = {BM.eur((+e.valor || 0) / parts.length)}</span></div>
+                    <div className="prem-ramt">{BM.eur(e.valor)}</div>
+                    <div className="prem-rbtns"><button className="icon-btn" title="Apagar despesa" onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).filter((x) => x.id !== e.id) })}><Icon name="trash" size={15} color="var(--neg)" /></button></div>
+                  </div>
+                  {devedores.length > 0 && (
+                    <div className="row" style={{ gap: 6, flexWrap: "wrap", padding: "0 14px 12px 52px" }}>
+                      {devedores.map((p) => {
+                        const pago = !!pagos[p];
+                        return <button type="button" key={p} className={"chip" + (pago ? " sel" : "")} style={{ cursor: "pointer" }} title={pago ? "Marcar como em dívida" : "Marcar como pago"}
+                          onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)) })}>{p}: {pago ? "pagou ✓" : "deve"}</button>;
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -494,7 +563,7 @@ function PartilhaInner() {
               <div className="card card-pad prem-gcard" key={g.id}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
                   <span className="prem-gico"><Icon name="users" size={18} color="var(--accent)" /></span>
-                  <button className="icon-btn" title="Apagar grupo" onClick={() => prem.remove("grupos", g.id)}><Icon name="trash" size={15} color="var(--neg)" /></button>
+                  <button className="icon-btn" title="Apagar grupo" onClick={() => setDelId(g.id)}><Icon name="trash" size={15} color="var(--neg)" /></button>
                 </div>
                 <b style={{ fontSize: 16, marginTop: 10, display: "block" }}>{g.nome}</b>
                 <div className="prem-avatars">
@@ -512,6 +581,12 @@ function PartilhaInner() {
         </div>
       )}
       {modal && <GrupoModal onClose={() => setModal(false)} onSave={(it) => { prem.add("grupos", it); setModal(false); }} />}
+      {delId && (window.RendeLock && window.RendeLock.hasPin()
+        ? <RLConfirmPin title="Eliminar grupo" desc="Vais eliminar este grupo e todas as suas despesas. Esta ação é irreversível." onConfirm={() => prem.remove("grupos", delId)} onClose={() => setDelId(null)} />
+        : <Modal title="Eliminar grupo" onClose={() => setDelId(null)}
+            footer={<><button className="btn btn-ghost" onClick={() => setDelId(null)}>Cancelar</button><button className="btn" style={{ background: "var(--neg)", color: "#fff", border: "none" }} onClick={() => { prem.remove("grupos", delId); setDelId(null); }}><Icon name="trash" size={14} color="#fff" /> Eliminar</button></>}>
+            <div className="muted" style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.6 }}>Vais eliminar este grupo e todas as suas despesas. Esta ação é irreversível.</div>
+          </Modal>)}
     </div>
   );
 }

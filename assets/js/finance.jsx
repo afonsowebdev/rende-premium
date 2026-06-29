@@ -17,6 +17,10 @@ const gravarFechadas = (map) => { try { localStorage.setItem(FECH_KEY, JSON.stri
 const ARQ_KEY = "rende_arquivos";
 const lerArquivos = () => { try { return JSON.parse(localStorage.getItem(ARQ_KEY) || "[]"); } catch (e) { return []; } };
 const gravarArquivos = (arr) => { try { localStorage.setItem(ARQ_KEY, JSON.stringify(arr)); } catch (e) {} };
+// registo de atividade (alterações: criou/editou/eliminou), guardado localmente por utilizador
+const ATIV_KEY = (email) => "rende_ativ_" + (email || "anon");
+const lerAtiv = (email) => { try { return JSON.parse(localStorage.getItem(ATIV_KEY(email)) || "[]"); } catch (e) { return []; } };
+const gravarAtiv = (email, arr) => { try { localStorage.setItem(ATIV_KEY(email), JSON.stringify(arr)); } catch (e) {} };
 const mkeyLocal = (dt) => dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
 
 // mostra um erro de forma simples (pode-se trocar por algo mais bonito no futuro)
@@ -152,13 +156,42 @@ function FinanceProvider({ children }) {
   const genResetCode = () => String(Math.floor(100000 + Math.random() * 900000));
   const resetPassword = () => {};
 
+  // ---- registo de atividade (#3) + Anular ao eliminar (#4) ----
+  const accEmail = (account && account.email) || null;
+  const [atividade, setAtividade] = React.useState(() => lerAtiv(accEmail));
+  React.useEffect(() => { setAtividade(lerAtiv(accEmail)); }, [accEmail]);
+  const registarAtividade = (acao, tipo, rotulo, valor) => {
+    setAtividade((prev) => {
+      const ev = { id: (BM.uid ? BM.uid() : String(Date.now())), ts: Date.now(), acao, tipo, rotulo: rotulo || "", valor: (valor == null ? null : +valor) };
+      const next = [ev, ...prev].slice(0, 400);
+      gravarAtiv(accEmail, next);
+      return next;
+    });
+  };
+  const limparAtividade = () => { gravarAtiv(accEmail, []); setAtividade([]); };
+
+  // toast com ação "Anular" (apoia o #4)
+  const [toast, setToast] = React.useState(null);
+  const toastTimer = React.useRef(null);
+  const notify = (msg, undo) => {
+    clearTimeout(toastTimer.current);
+    setToast({ msg, undo });
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
+  };
+
+  // referência ao estado mais recente (para recuperar um item ao Anular)
+  const dataRef = React.useRef(data);
+  React.useEffect(() => { dataRef.current = data; });
+
   // ---- CRUD genérico (cria/edita/apaga no servidor e atualiza o estado local) ----
-  const crud = (key, recurso, paraApi, daApi) => ({
+  // desc (opcional): { tipo, rotulo:(x)=>txt, valor:(x)=>num, undo:bool } — alimenta o histórico e o Anular
+  const crud = (key, recurso, paraApi, daApi, desc) => ({
     add: async (item) => {
       try {
         const criado = await API.criar(recurso, paraApi ? paraApi(item) : item);
         const local = daApi ? daApi(criado) : criado;
         setData((d) => ({ ...d, [key]: [...d[key], local] }));
+        if (desc) registarAtividade("criou", desc.tipo, desc.rotulo(local), desc.valor ? desc.valor(local) : null);
         return local;
       } catch (e) { erroAlerta(e); }
     },
@@ -167,18 +200,33 @@ function FinanceProvider({ children }) {
         const at = await API.editar(recurso, id, paraApi ? paraApi(patch) : patch);
         const local = daApi ? daApi(at) : at;
         setData((d) => ({ ...d, [key]: d[key].map((x) => (x.id === id ? { ...x, ...local } : x)) }));
+        if (desc) registarAtividade("editou", desc.tipo, desc.rotulo({ ...(dataRef.current[key] || []).find((x) => x.id === id), ...local }), desc.valor ? desc.valor({ ...local }) : null);
       } catch (e) { erroAlerta(e); }
     },
     remove: async (id) => {
+      const snap = (dataRef.current[key] || []).find((x) => x.id === id);
       try {
         await API.apagar(recurso, id);
         setData((d) => ({ ...d, [key]: d[key].filter((x) => x.id !== id) }));
+        if (desc) registarAtividade("eliminou", desc.tipo, desc.rotulo(snap || {}), desc.valor ? desc.valor(snap || {}) : null);
+        if (desc && desc.undo && snap) {
+          notify((desc.tipo || "Item") + " eliminado", async () => {
+            try {
+              const { id: _omit, ...payload } = snap;
+              const criado = await API.criar(recurso, paraApi ? paraApi(payload) : payload);
+              const local = daApi ? daApi(criado) : criado;
+              setData((d) => ({ ...d, [key]: [...d[key], local] }));
+              registarAtividade("criou", desc.tipo, (desc.rotulo(local) || "") + " (restaurado)", desc.valor ? desc.valor(local) : null);
+              setToast(null);
+            } catch (e) { erroAlerta(e); }
+          });
+        }
       } catch (e) { erroAlerta(e); }
     },
   });
-  const despesa = crud("despesas", "despesas");
-  const rendimento = crud("rendimentos", "rendimentos");
-  const conta = crud("contas", "contas");
+  const despesa = crud("despesas", "despesas", null, null, { tipo: "Despesa", rotulo: (x) => x.nome || "", valor: (x) => x.valor, undo: true });
+  const rendimento = crud("rendimentos", "rendimentos", null, null, { tipo: "Rendimento", rotulo: (x) => x.fonte || "", valor: (x) => x.valor, undo: true });
+  const conta = crud("contas", "contas", null, null, { tipo: "Conta", rotulo: (x) => x.nome || x.banco || "" });
 
   // metas (poupanças): criar com saldo inicial regista um depósito datado
   const meta = {
@@ -201,6 +249,7 @@ function FinanceProvider({ children }) {
           metas: [...d.metas, { ...m, cor: item.cor || PALETA[d.metas.length % PALETA.length] }],
           aforros: novoAforro ? [...(d.aforros || []), { ...novoAforro, inicial: ini, data: novoAforro.data || dataAforro }] : (d.aforros || []),
         }));
+        registarAtividade("criou", "Meta", item.nome, item.alvo);
         return m;
       } catch (e) { erroAlerta(e); }
     },
@@ -208,7 +257,9 @@ function FinanceProvider({ children }) {
       try {
         await API.apagar("metas", id);
         const map = lerFechadas(); delete map[id]; gravarFechadas(map);
+        const snapMeta = (dataRef.current.metas || []).find((x) => x.id === id);
         setData((d) => ({ ...d, metas: d.metas.filter((x) => x.id !== id), aforros: (d.aforros || []).filter((a) => a.metaId !== id) }));
+        registarAtividade("eliminou", "Meta", snapMeta ? snapMeta.nome : "");
       } catch (e) { erroAlerta(e); }
     },
     fechar: async (id) => {
@@ -238,6 +289,7 @@ function FinanceProvider({ children }) {
         metas: d.metas.map((x) => (x.id === id ? { ...x, atual: capado } : x)),
         aforros: [...(d.aforros || []), { ...aforro, inicial: !!inicial, data: aforro.data || dataAforro }],
       }));
+      registarAtividade("criou", "Depósito", (m ? m.nome : ""), valor);
     } catch (e) { erroAlerta(e); }
   };
 
@@ -393,9 +445,21 @@ function FinanceProvider({ children }) {
     cur: BM.curInfo(), curSym: BM.curInfo().sym, setCurrency: (code) => updateAccount({ moeda: code }),
     despesa, rendimento, meta, conta, deposit, setOrcamento, setPoupancaPct, addCategory, removeCategory,
     connectBank, disconnectBank, importMovs, bancosTotal,
+    atividade, registarAtividade, limparAtividade, notify,
     setMonth, shiftMonth, goToday, ...sel,
   };
-  return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
+  return (
+    <FinanceContext.Provider value={value}>
+      {children}
+      {toast && (
+        <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 9500, background: "var(--ink, #0f1a16)", color: "#fff", borderRadius: 13, padding: "12px 16px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 12px 30px rgba(0,0,0,.25)", fontSize: 14, fontWeight: 600, maxWidth: "calc(100vw - 32px)" }}>
+          <span>{toast.msg}</span>
+          {toast.undo && <button onClick={toast.undo} style={{ background: "none", border: "none", color: "var(--accent, #14a06b)", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>Anular</button>}
+          <button onClick={() => setToast(null)} aria-label="Fechar" style={{ background: "none", border: "none", color: "rgba(255,255,255,.6)", fontWeight: 700, fontSize: 16, cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+      )}
+    </FinanceContext.Provider>
+  );
 }
 
 Object.assign(window, { FinanceContext, useFinance, FinanceProvider });

@@ -176,17 +176,77 @@ function Relatorios() {
 }
 
 /* ---------- HISTÓRICO ---------- */
+/* ---------- Lista de atividade (registo de alterações) ---------- */
+const _fmtDiaAtiv = (ts) => {
+  const d = new Date(ts), h = new Date(), o = new Date(h); o.setDate(h.getDate() - 1);
+  if (d.toDateString() === h.toDateString()) return "Hoje";
+  if (d.toDateString() === o.toDateString()) return "Ontem";
+  return d.toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
+};
+const _fmtHoraAtiv = (ts) => new Date(ts).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+
+function AtividadeLista() {
+  const fin = useFinance();
+  const [filtro, setFiltro] = React.useState("tudo");
+  const todas = fin.atividade || [];
+  if (todas.length === 0) {
+    return <EmptyState icon="history" title="Sem atividade ainda"
+      msg="Cada vez que crias, editas ou eliminas uma despesa, rendimento ou meta, fica aqui registado." />;
+  }
+  const itens = todas.filter((a) => (filtro === "tudo" ? true : a.acao === filtro));
+  const grupos = []; const idx = {};
+  itens.forEach((a) => { const k = _fmtDiaAtiv(a.ts); if (idx[k] == null) { idx[k] = grupos.length; grupos.push([k, []]); } grupos[idx[k]][1].push(a); });
+  const cor = { criou: "var(--accent)", editou: "var(--c-internet)", eliminou: "var(--neg)" };
+  const rotuloAcao = { criou: "Criou", editou: "Editou", eliminou: "Eliminou" };
+  return (
+    <>
+      <div className="card card-pad row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+        <div className="seg" style={{ flexWrap: "wrap" }}>
+          {[["tudo", "Tudo"], ["criou", "Criadas"], ["editou", "Editadas"], ["eliminou", "Eliminadas"]].map(([k, l]) =>
+            <button key={k} className={filtro === k ? "on" : ""} onClick={() => setFiltro(k)}>{l}</button>)}
+        </div>
+        <button className="btn btn-ghost" onClick={() => fin.limparAtividade()}><Icon name="trash" size={14} /> Limpar</button>
+      </div>
+      {grupos.length === 0 && <div className="card card-pad muted tiny" style={{ fontWeight: 600 }}>Sem registos para este filtro.</div>}
+      {grupos.map(([dia, lista]) => (
+        <div className="card" key={dia} style={{ marginBottom: 14 }}>
+          <div className="card-pad" style={{ borderBottom: "1px solid var(--border)", fontWeight: 800, fontSize: 12.5, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)" }}>{dia}</div>
+          {lista.map((a, i) => (
+            <div className="row" key={a.id} style={{ gap: 12, padding: "11px 16px", borderBottom: i < lista.length - 1 ? "1px solid var(--border)" : "none" }}>
+              <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 7, color: "#fff", background: cor[a.acao] || "var(--ink-3)", flex: "none" }}>{rotuloAcao[a.acao] || a.acao}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.rotulo || "—"}</div>
+                <div className="tiny muted" style={{ fontWeight: 600 }}>{a.tipo} · {_fmtHoraAtiv(a.ts)}</div>
+              </div>
+              {a.valor != null && <div className="tnum" style={{ fontWeight: 700, flex: "none" }}>{BM.eur(a.valor)}</div>}
+            </div>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
 function Historico() {
   const fin = useFinance();
   const [q, setQ] = React.useState("");
-  const hist = fin.historico.filter((h) => h.label.toLowerCase().includes(q.toLowerCase()));
+  const [vista, setVista] = React.useState("atividade");
+  const seg = (
+    <div className="seg" style={{ marginBottom: 14, width: "fit-content" }}>
+      <button className={vista === "atividade" ? "on" : ""} onClick={() => setVista("atividade")}>Atividade</button>
+      <button className={vista === "mensal" ? "on" : ""} onClick={() => setVista("mensal")}>Resumo mensal</button>
+    </div>
+  );
+  if (vista === "atividade") return <div className="content">{seg}<AtividadeLista /></div>;
   if (fin.historico.length === 0) {
-    return <div className="content"><EmptyState icon="history" title="Sem histórico ainda"
-      msg="O teu histórico mensal aparece aqui automaticamente à medida que vais registando rendimentos e despesas." /></div>;
+    return <div className="content">{seg}<EmptyState icon="history" title="Sem histórico ainda"
+      msg="O teu resumo mensal aparece aqui automaticamente à medida que vais registando rendimentos e despesas." /></div>;
   }
+  const hist = fin.historico.filter((h) => h.label.toLowerCase().includes(q.toLowerCase()));
   const trend = fin.series.map((m) => m.rec - m.gasto);
   return (
     <div className="content">
+      {seg}
       <div className="card">
         <div className="card-pad row" style={{ justifyContent: "space-between", borderBottom: "1px solid var(--border)", flexWrap: "wrap", gap: 12 }}>
           <div className="row" style={{ flex: 1, minWidth: 220, gap: 10, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "9px 13px" }}>
@@ -225,6 +285,7 @@ function Perfil({ open }) {
   const a = fin.account || {};
   const metas = fin.data.metas || [];
   const [confirmClear, setConfirmClear] = React.useState(false);
+  const [pinClear, setPinClear] = React.useState(false);
   const stats = [
     { ico: "coins", v: a.moeda || "EUR", l: "Moeda", bg: "var(--accent-soft)", c: "var(--accent)" },
     { ico: "spark", v: BM.eur0(fin.poupado || 0), l: "Poupado", bg: "color-mix(in srgb, var(--c-educacao) 16%, transparent)", c: "var(--c-educacao)" },
@@ -292,7 +353,7 @@ function Perfil({ open }) {
               <div className="row" style={{ gap: 10, marginTop: 24 }}>
                 <button className="btn btn-soft" style={{ flex: 1, justifyContent: "center" }} onClick={() => setConfirmClear(false)}>Cancelar</button>
                 <button className="btn" style={{ flex: 1, justifyContent: "center", background: "var(--neg)", color: "#fff", border: "none" }}
-                  onClick={() => { setConfirmClear(false); fin.resetData(); }}>
+                  onClick={() => { setConfirmClear(false); if (window.RendeLock && window.RendeLock.hasPin()) setPinClear(true); else fin.resetData(); }}>
                   <Icon name="trash" size={15} color="#fff" /> Limpar
                 </button>
               </div>
@@ -300,6 +361,7 @@ function Perfil({ open }) {
           </div>
         </div>
       )}
+      {pinClear && <RLConfirmPin title="Limpar todos os dados" desc="Esta ação remove todas as despesas, rendimentos e metas e não pode ser revertida." onConfirm={() => fin.resetData()} onClose={() => setPinClear(false)} />}
     </div>
   );
 }
