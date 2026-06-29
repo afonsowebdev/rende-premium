@@ -310,6 +310,11 @@ function Definicoes({ theme, setTheme, open }) {
   const a = fin.account || {};
   const [notif, setNotif] = React.useState(true);
   const [alertas, setAlertas] = React.useState(true);
+  const [pinModal, setPinModal] = React.useState(false);
+  const [, force] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => window.RendeLock.subscribe(force), []);
+  const hasPin = window.RendeLock.hasPin();
+  const lockMin = window.RendeLock.getMinutes();
 
   const Section = ({ title, icon, children }) => (
     <div className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -344,6 +349,24 @@ function Definicoes({ theme, setTheme, open }) {
         <Rowi label="Alertas inteligentes" sub="Avisos de orçamento e poupança" last><Toggle on={alertas} onClick={() => setAlertas(!alertas)} /></Rowi>
       </Section>
 
+      <Section title="Segurança" icon="shield">
+        <Rowi label="PIN de bloqueio" sub={hasPin ? "Definido — a app bloqueia por inatividade" : "Sem PIN — a app não bloqueia"}>
+          {hasPin
+            ? <button className="btn btn-ghost" style={{ color: "var(--neg)" }} onClick={() => window.RendeLock.removePin()}><Icon name="trash" size={14} /> Remover</button>
+            : <button className="btn btn-primary" onClick={() => setPinModal(true)}><Icon name="lock" size={14} color="#fff" /> Definir PIN</button>}
+        </Rowi>
+        {hasPin && <>
+          <Rowi label="Bloquear após inatividade" sub="Tempo sem usar até a app pedir o PIN">
+            <select className="select" style={{ width: "auto" }} value={lockMin} onChange={(e) => window.RendeLock.setMinutes(Number(e.target.value))}>
+              {[1, 5, 15, 30, 60].map((m) => <option key={m} value={m}>{m} min</option>)}
+            </select>
+          </Rowi>
+          <Rowi label="Bloquear agora" sub="Termina já o acesso até voltares a introduzir o PIN" last>
+            <button className="btn btn-ghost" onClick={() => window.RendeLock.lockNow()}><Icon name="lock" size={14} /> Bloquear</button>
+          </Rowi>
+        </>}
+      </Section>
+
       <Section title="Categorias de despesa" icon="grid">
         <Rowi label="Categorias personalizadas" sub={(fin.data.customCats || []).length ? `${fin.data.customCats.length} categoria(s) criada(s)` : "Cria categorias próprias ao registar uma despesa"} last={!(fin.data.customCats || []).length}>
           <button className="btn btn-ghost" onClick={() => open("despesa")}><Icon name="plus" size={14} /> Adicionar</button>
@@ -359,6 +382,8 @@ function Definicoes({ theme, setTheme, open }) {
           </div>
         )}
       </Section>
+
+      {pinModal && <RLPinSetup onClose={() => setPinModal(false)} />}
     </div>
   );
 }

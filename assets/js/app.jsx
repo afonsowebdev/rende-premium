@@ -478,6 +478,7 @@ function Shell() {
       <MobileNav route={route} go={go} onMore={() => setMoreOpen(true)} />
       {moreOpen && <MoreSheet route={route} go={go} onClose={() => setMoreOpen(false)} theme={theme} setTheme={setTheme} onLogout={fin.logout} />}
       {modal && <EntryModal type={modal.type} item={modal.item} onClose={() => setModal(null)} />}
+      <LockGate active={!!fin.session} />
       {panel}
     </div>
   );
