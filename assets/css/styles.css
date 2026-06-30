@@ -1266,3 +1266,69 @@ input.range::-moz-range-thumb { width: 19px; height: 19px; border-radius: 50%; b
   border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 40, 28, .05);
 }
 .page-actions .btn-soft:hover, .topbar .btn-soft:hover { background: var(--surface-2); color: var(--ink); filter: none; }
+
+/* ============================================================
+   RENDE+ · Menu mobile (hamburger + drawer)
+   ============================================================ */
+.menu-btn {
+  display: none; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin-left: -6px;
+  border: none; background: none; color: var(--ink); border-radius: 10px; cursor: pointer;
+  transition: background .14s ease;
+}
+.menu-btn:hover { background: var(--surface-2); }
+
+.drawer-root { position: fixed; inset: 0; z-index: 250; pointer-events: none; }
+.drawer-overlay { position: absolute; inset: 0; background: rgba(8, 22, 16, .42); opacity: 0; transition: opacity .25s ease; }
+.drawer {
+  position: absolute; top: 0; left: 0; height: 100%; width: min(87vw, 322px);
+  background: var(--surface); box-shadow: 0 0 48px rgba(0, 0, 0, .28);
+  display: flex; flex-direction: column;
+  transform: translateX(-102%); transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+}
+.drawer-root.open { pointer-events: auto; }
+.drawer-root.open .drawer-overlay { opacity: 1; }
+.drawer-root.open .drawer { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } .drawer-overlay { transition: none; } }
+@media (min-width: 861px) { .drawer-root { display: none; } }
+
+.drawer-top { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px 10px; }
+.drawer-brand { border: none; background: none; padding: 0; cursor: pointer; text-align: left; }
+.drawer-x {
+  display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0;
+  border: none; background: none; color: var(--ink-3); border-radius: 10px; cursor: pointer; transition: background .14s ease;
+}
+.drawer-x:hover { background: var(--surface-2); color: var(--ink); }
+
+.drawer-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 12px 14px; }
+.drawer-scroll .nav-label { margin: 14px 8px 6px; }
+.drawer-scroll .nav-label:first-child { margin-top: 4px; }
+
+.dr-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 12px; margin-bottom: 2px; border: none; background: none;
+  font: inherit; font-size: 14.5px; font-weight: 600; color: var(--ink-2);
+  border-radius: 10px; cursor: pointer; text-align: left; transition: background .14s ease, color .14s ease;
+}
+.dr-item > span { flex: 1; min-width: 0; }
+.dr-item:hover { background: var(--surface-2); color: var(--ink); }
+.dr-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+[data-theme="dark"] .dr-item.active { color: #7fe3b4; }
+.dr-item.danger { color: var(--neg); }
+.dr-item.danger:hover { background: color-mix(in srgb, var(--neg) 12%, transparent); }
+
+.drawer-acct { border-top: 1px solid var(--border); padding: 10px; background: var(--surface); }
+.drawer-acct-head {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 10px; border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 12px; cursor: pointer; text-align: left; transition: background .14s ease;
+}
+.drawer-acct-head:hover { background: var(--surface); }
+.drawer-acct-txt { flex: 1; min-width: 0; }
+.da-name { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.da-plan { font-size: 12px; color: var(--ink-3); }
+.da-chev { display: grid; color: var(--ink-3); transition: transform .2s ease; }
+.drawer-acct-menu { padding: 6px 0 2px; }
+.drawer-acct-menu .dr-item { font-weight: 600; }
+
+body.drawer-lock { overflow: hidden; }

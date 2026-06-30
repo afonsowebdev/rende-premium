@@ -372,6 +372,7 @@ function Shell() {
   }); // null = landing | "signup" | "login" — abre direto via /#criar-conta ou /#entrar
   const [modal, setModal] = useState(null); // { type, item }
   const [moreOpen, setMoreOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sbCollapsed, setSbCollapsed] = useState(() => { try { return localStorage.getItem("rende_sb") === "1"; } catch (e) { return false; } });
   const toggleSidebar = () => setSbCollapsed((v) => { const n = !v; try { localStorage.setItem("rende_sb", n ? "1" : "0"); } catch (e) {} return n; });
   const [lang, setLang] = useLang();
@@ -456,7 +457,7 @@ function Shell() {
       <Sidebar route={route} go={go} account={fin.account} collapsed={sbCollapsed} onToggle={toggleSidebar} onLogout={fin.logout} />
       <div className="main">
         <Topbar go={go} title={pageTitle} sub={PREM_PAGE[route] ? PREM_PAGE[route][1] : subByRoute[route]} theme={theme} setTheme={setTheme} onLogout={fin.logout}
-          ocultar={ocultar} onToggleOcultar={toggleOcultar} />
+          ocultar={ocultar} onToggleOcultar={toggleOcultar} onMenu={() => setDrawerOpen(true)} />
         {(showMonthNav || P.add) && (
           <div className="page-actions">
             {showMonthNav && <MonthNav label={fin.monthLabel} onPrev={() => fin.shiftMonth(-1)} onNext={() => fin.shiftMonth(1)}
@@ -481,6 +482,7 @@ function Shell() {
         {route === "premium" && <Paywall />}
       </div>
       {moreOpen && false && <span />}
+      <MobileMenu open={drawerOpen} onClose={() => setDrawerOpen(false)} route={route} go={go} account={fin.account} onLogout={fin.logout} />
       {modal && <EntryModal type={modal.type} item={modal.item} onClose={() => setModal(null)} />}
       <LockGate active={!!fin.session} />
       {panel}

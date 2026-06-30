@@ -18,6 +18,7 @@ const BX = {
   sheet: "bx-spreadsheet", repeat: "bx-repeat", lock: "bx-lock-alt", rocket: "bx-rocket",
   collapse: "bx-chevrons-left", trend: "bx-trending-up", piechart: "bx-pie-chart-alt-2", calc: "bx-calculator",
   smile: "bx-smile", globe: "bx-globe", refresh: "bx-refresh", star: "bxs-star",
+  menu: "bx-menu", x: "bx-x", chevD: "bx-chevron-down", chevU: "bx-chevron-up",
 };
 
 function Icon({ name, size = 18, color = "currentColor", sw = 1.7, style }) {

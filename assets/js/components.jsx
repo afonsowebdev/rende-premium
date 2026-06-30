@@ -111,7 +111,7 @@ function MonthNav({ label, onPrev, onNext, canNext = true, isCurrent, onToday })
   );
 }
 
-function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOcultar, go }) {
+function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOcultar, go, onMenu }) {
   const fin = useFinance();
   const acc = fin.account || {};
   const nome = acc.nome || "Conta";
@@ -128,6 +128,11 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
   return (
     <div className="topbar">
       <div className="row topbar-left" style={{ gap: 11, minWidth: 0 }}>
+        {onMenu && (
+          <button className="menu-btn" onClick={onMenu} aria-label="Abrir menu" title="Abrir menu">
+            <Icon name="menu" size={23} />
+          </button>
+        )}
         <div className="mobile-brand brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}><span className="brand-mark-txt" style={{ fontSize: 17 }}>R</span></div>
         <div className="topbar-title" style={{ minWidth: 0 }}>
           <h1 className="page-title">{title}</h1>
@@ -171,6 +176,99 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MobileMenu({ open, onClose, route, go, account, onLogout }) {
+  const tr = useT();
+  const fin = useFinance();
+  const acc = account || fin.account || {};
+  const nome = acc.nome || "Conta";
+  const [acctOpen, setAcctOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) { setAcctOpen(false); return; }
+    const esc = (e) => { if (e.key === "Escape") onClose && onClose(); };
+    document.addEventListener("keydown", esc);
+    document.body.classList.add("drawer-lock");
+    return () => { document.removeEventListener("keydown", esc); document.body.classList.remove("drawer-lock"); };
+  }, [open]);
+
+  const nav = [
+    { id: "dashboard", label: tr("lbl_dashboard"), icon: "grid" },
+    { id: "despesas", label: tr("lbl_expenses"), icon: "wallet" },
+    { id: "rendimentos", label: tr("lbl_income"), icon: "coins" },
+    { id: "poupanca", label: tr("lbl_savings"), icon: "target" },
+  ];
+  const nav2 = [
+    { id: "relatorios", label: tr("lbl_reports"), icon: "piechart" },
+    { id: "historico", label: tr("lbl_history"), icon: "history" },
+    { id: "config", label: tr("lbl_settings"), icon: "gear" },
+  ];
+  const navPrem = [
+    { id: "subscricoes", label: "Subscrições", icon: "tv", badge: true },
+    { id: "lembretes", label: "Lembretes", icon: "bell" },
+    { id: "recorrentes", label: "Recorrentes", icon: "repeat" },
+    { id: "partilha", label: "Partilha", icon: "users" },
+    { id: "previsao", label: "Previsão", icon: "trend" },
+  ];
+  const acct = [
+    { id: "perfil", label: "Meu perfil", icon: "user" },
+    { id: "premium", label: "Plano e faturação", icon: "card" },
+    { id: "config", label: "Segurança", icon: "shield" },
+    { id: "config", label: "Idioma", icon: "globe" },
+  ];
+  const goClose = (id) => { go && go(id); onClose && onClose(); };
+  const Item = (n) => (
+    <button key={n.id} className={"dr-item" + (route === n.id ? " active" : "")} onClick={() => goClose(n.id)}>
+      <Icon name={n.icon} size={20} />
+      <span>{n.label}</span>
+      {n.badge && <PremiumBadge />}
+    </button>
+  );
+
+  return (
+    <div className={"drawer-root" + (open ? " open" : "")} aria-hidden={!open}>
+      <div className="drawer-overlay" onClick={onClose} />
+      <aside className="drawer" role="dialog" aria-label="Menu">
+        <div className="drawer-top">
+          <button className="drawer-brand" onClick={() => goClose("dashboard")} title={tr("go_dashboard")}>
+            <Brand nameColor="var(--ink)" premiumBelow />
+          </button>
+          <button className="drawer-x" onClick={onClose} aria-label="Fechar menu"><Icon name="x" size={22} /></button>
+        </div>
+        <nav className="drawer-scroll">
+          <div className="nav-label">{tr("lbl_general")}</div>
+          {nav.map(Item)}
+          <div className="nav-label">{tr("lbl_analysis")}</div>
+          {nav2.map(Item)}
+          <div className="nav-label">Premium</div>
+          {navPrem.map(Item)}
+        </nav>
+        <div className={"drawer-acct" + (acctOpen ? " open" : "")}>
+          <button className="drawer-acct-head" onClick={() => setAcctOpen((v) => !v)} aria-expanded={acctOpen}>
+            <Avatar account={acc} size={38} />
+            <div className="drawer-acct-txt">
+              <div className="da-name">{nome}</div>
+              <div className="da-plan">Plano Premium</div>
+            </div>
+            <span className="da-chev" style={{ transform: acctOpen ? "rotate(180deg)" : "none" }}><Icon name="chevD" size={18} /></span>
+          </button>
+          {acctOpen && (
+            <div className="drawer-acct-menu">
+              {acct.map((a, i) => (
+                <button key={i} className="dr-item" onClick={() => goClose(a.id)}>
+                  <Icon name={a.icon} size={19} /> <span>{a.label}</span>
+                </button>
+              ))}
+              <button className="dr-item danger" onClick={() => { onClose && onClose(); onLogout && onLogout(); }}>
+                <Icon name="logout" size={19} /> <span>Sair da conta</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
@@ -330,4 +428,4 @@ function Modal({ title, sub, onClose, children, footer, wide }) {
   );
 }
 
-Object.assign(window, { initials, Avatar, Brand, CatBadge, Sidebar, MobileNav, MoreSheet, MonthNav, Topbar, Kpi, Alert, Progress, EmptyState, Field, Modal });
+Object.assign(window, { initials, Avatar, Brand, CatBadge, Sidebar, MobileMenu, MobileNav, MoreSheet, MonthNav, Topbar, Kpi, Alert, Progress, EmptyState, Field, Modal });
