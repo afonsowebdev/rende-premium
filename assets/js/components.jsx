@@ -140,6 +140,7 @@ function Topbar({ title, sub, theme, setTheme, onLogout, onAdd, addLabel, monthN
             <Icon name={ocultar ? "eyeOff" : "eye"} size={18} />
           </button>
         )}
+        <NotifBell />
         <button className="icon-btn hide-mobile" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Mudar tema">
           <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
         </button>
@@ -229,7 +230,7 @@ function MoreSheet({ route, go, onClose, theme, setTheme, onLogout }) {
   );
 }
 
-function Kpi({ label, value, sub, delta, deltaDir, icon, color, spark, onClick }) {
+function Kpi({ label, value, sub, delta, deltaDir, deltaTone, icon, color, spark, onClick }) {
   return (
     <div className={"card card-pad kpi" + (onClick ? " is-hover" : "")} onClick={onClick}
       role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
@@ -245,7 +246,7 @@ function Kpi({ label, value, sub, delta, deltaDir, icon, color, spark, onClick }
         <div className="kpi-label">{label}{onClick && <Icon name="chevR" size={13} color="var(--ink-3)" />}</div>
         <div className="kpi-val tnum valor-sensivel" style={{ marginTop: 6 }}>{value}</div>
         {!spark && delta != null && (
-          <div className={"delta kpi-delta " + (deltaDir === "down" ? "down" : deltaDir === "flat" ? "flat" : "up")} style={{ marginTop: 9 }}>
+          <div className={"delta kpi-delta " + (deltaTone === "neg" ? "down" : (deltaTone === "flat" || deltaDir === "flat") ? "flat" : deltaTone === "pos" ? "up" : (deltaDir === "down" ? "down" : "up"))} style={{ marginTop: 9 }}>
             {deltaDir !== "flat" && <Icon name={deltaDir === "down" ? "arrowDown" : "arrowUp"} size={13} />} {delta}
           </div>
         )}

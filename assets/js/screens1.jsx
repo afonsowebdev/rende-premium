@@ -323,10 +323,11 @@ function Dashboard({ go, open }) {
   const metasAll = fin.data.metas || [];
   const metasDone = metasAll.filter((m) => m.atual >= m.alvo).length;
   const metasPct = metasAll.length ? Math.round((metasDone / metasAll.length) * 100) : 0;
-  const deltaTxt = (d) => (<>{Math.abs(d).toLocaleString("pt-PT")}% <span className="muted" style={{ fontWeight: 600 }}>vs. mês passado</span></>);
+  const deltaTxt = (d) => { const s = d > 0 ? "+" : (d < 0 ? "-" : ""); return (<>{s}{Math.abs(d).toLocaleString("pt-PT")}% <span className="muted" style={{ fontWeight: 600 }}>vs. mês passado</span></>); };
   const deltaSemBase = (<>— <span className="muted" style={{ fontWeight: 600 }}>vs. mês passado</span></>);
   const dProp = (d) => (d == null ? deltaSemBase : deltaTxt(d));
-  const dDir = (d) => (d == null ? "flat" : (d < 0 ? "down" : "up"));
+  const dArrow = (d) => (d == null ? "flat" : (d < 0 ? "down" : "up"));
+  const dTone = (d, upGood) => ((d == null || d === 0) ? "flat" : (((d > 0) === upGood) ? "pos" : "neg"));
   const colorOfCat = (key) => (BM.cats[key] && BM.cats[key].color) || (((fin.data.customCats || []).find((c) => c.key === key) || {}).color) || "var(--c-outros)";
   const cats = (fin.catBreak || []).slice(0, 6);
   const catTotal = (fin.catBreak || []).reduce((s, c) => s + c.valor, 0) || 1;
@@ -361,10 +362,10 @@ function Dashboard({ go, open }) {
   return (
     <div className="content">
       <div className="grid kpi4" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
-        <Kpi label="Saldo atual" value={BM.eur(fin.saldo)} icon="wallet" color="var(--accent)" delta={dProp(dSaldo)} deltaDir={dDir(dSaldo)} />
-        <Kpi label={tr("kpi_received")} value={BM.eur(fin.totalRec)} icon="coins" color="var(--pos)" delta={dProp(dRec)} deltaDir={dDir(dRec)} onClick={() => setDetalhe("rec")} />
-        <Kpi label={tr("kpi_spent")} value={BM.eur(fin.totalGasto)} icon="cart" color="var(--neg)" delta={dProp(dGasto)} deltaDir={dDir(dGasto)} onClick={() => setDetalhe("gasto")} />
-        <Kpi label="Poupança do mês" value={BM.eur(fin.poupado)} icon="trend" color="var(--c-educacao)" delta={dProp(dSaldo)} deltaDir={dDir(dSaldo)} />
+        <Kpi label="Saldo atual" value={BM.eur(fin.saldo)} icon="wallet" color="var(--accent)" delta={dProp(dSaldo)} deltaDir={dArrow(dSaldo)} deltaTone={dTone(dSaldo, true)} />
+        <Kpi label={tr("kpi_received")} value={BM.eur(fin.totalRec)} icon="coins" color="var(--pos)" delta={dProp(dRec)} deltaDir={dArrow(dRec)} deltaTone={dTone(dRec, true)} onClick={() => setDetalhe("rec")} />
+        <Kpi label={tr("kpi_spent")} value={BM.eur(fin.totalGasto)} icon="cart" color="var(--neg)" delta={dProp(dGasto)} deltaDir={dArrow(dGasto)} deltaTone={dTone(dGasto, false)} onClick={() => setDetalhe("gasto")} />
+        <Kpi label="Poupança do mês" value={BM.eur(fin.poupado)} icon="trend" color="var(--c-educacao)" delta={dProp(dSaldo)} deltaDir={dArrow(dSaldo)} deltaTone={dTone(dSaldo, true)} />
       </div>
       {detalhe && <KpiDetalheModal tipo={detalhe === "gasto" ? "gasto" : "rec"} fin={fin} onClose={() => setDetalhe(null)} />}
 

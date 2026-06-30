@@ -95,8 +95,9 @@ function LineChart({ data, height = 216, color = "var(--accent)", color2 = "var(
     }
     return d;
   };
-  const recLine = smooth(toPts("rec"));
-  const gastoLine = smooth(toPts("gasto"));
+  const linear = (P) => (P.length ? "M" + P.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L") : "");
+  const recLine = linear(toPts("rec"));
+  const gastoLine = linear(toPts("gasto"));
   const base = H - pad.b;
   const recArea = recLine + ` L${x(data.length - 1).toFixed(1)},${base} L${x(0).toFixed(1)},${base} Z`;
   const fs = mobile ? 12 : 11.5;
