@@ -1144,3 +1144,48 @@ input.range::-moz-range-thumb { width: 19px; height: 19px; border-radius: 50%; b
 /* KPIs do dashboard agora são 4 */
 @media (max-width: 1100px) { .kpi4 { grid-template-columns: repeat(2, 1fr) !important; } }
 @media (max-width: 560px) { .kpi4 { grid-template-columns: 1fr !important; } }
+
+/* ============================================================
+   RENDE+ · Cartões KPI — base aprovada por Francisco
+   separação: nenhuma · espaço: 5px · sombra: 100% · cantos: 8px
+   ícones em círculo cheio (cor sólida + ícone branco)
+   ============================================================ */
+.kpi4 { gap: 5px; }
+.kpi {
+  background: var(--surface);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px -28px rgba(16, 40, 28, .30);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.kpi.is-hover:hover, .kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px -26px rgba(16, 40, 28, .34);
+}
+.kpi-ico {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  flex: none;
+}
+
+/* ============================================================
+   RENDE+ · TODOS os cartões — base unificada (igual aos KPI)
+   branco (adapta ao tema) · sem borda · cantos 8px · sombra 100%
+   hover só nos cartões interativos (.is-hover)
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px -28px rgba(16, 40, 28, .30);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.card:hover { transform: none; box-shadow: 0 16px 40px -28px rgba(16, 40, 28, .30); }
+.card.is-hover:hover, .kpi.is-hover:hover {
+  transform: translateY(-2px);
+  border-color: transparent;
+  box-shadow: 0 20px 44px -26px rgba(16, 40, 28, .34);
+}
+.modal { border-radius: 14px; }
+.modal:hover { transform: none; box-shadow: var(--shadow-md); }
