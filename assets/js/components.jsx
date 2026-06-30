@@ -109,7 +109,7 @@ function MonthNav({ label, onPrev, onNext, canNext = true, isCurrent, onToday })
       )}
       <div className="seg" style={{ padding: 2 }}>
         <button onClick={onPrev} style={{ padding: "6px 9px" }}><span style={{ transform: "rotate(180deg)", display: "grid" }}><Icon name="chevR" size={15} /></span></button>
-        <span style={{ display: "grid", placeItems: "center", padding: "0 12px", fontSize: 13, fontWeight: 700, minWidth: 96 }}>{label}</span>
+        <button onClick={!isCurrent && onToday ? onToday : undefined} title={!isCurrent ? "Ir para o mês atual" : ""} style={{ display: "grid", placeItems: "center", padding: "0 12px", fontSize: 13, fontWeight: 700, minWidth: 96, background: "none", border: "none", fontFamily: "inherit", color: "inherit", cursor: !isCurrent ? "pointer" : "default" }}>{label}</button>
         <button onClick={canNext ? onNext : undefined} disabled={!canNext} title={canNext ? "" : tr("month_at_current")}
           style={{ padding: "6px 9px", opacity: canNext ? 1 : 0.35, cursor: canNext ? "pointer" : "not-allowed" }}><Icon name="chevR" size={15} /></button>
       </div>
@@ -117,78 +117,22 @@ function MonthNav({ label, onPrev, onNext, canNext = true, isCurrent, onToday })
   );
 }
 
-function Topbar({ title, sub, theme, setTheme, onLogout, onAdd, addLabel, monthNav, ocultar, onToggleOcultar, go }) {
-  const tr = useT();
+function Topbar({ theme, setTheme, go }) {
   const fin = useFinance();
   const acc = fin.account || {};
   const nome = acc.nome || "Conta";
   const iniciais = (nome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("") || "R").toUpperCase();
-  const [menu, setMenu] = React.useState(false);
-  const wrapRef = React.useRef(null);
-  React.useEffect(() => {
-    if (!menu) return;
-    const fora = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setMenu(false); };
-    const esc = (e) => { if (e.key === "Escape") setMenu(false); };
-    document.addEventListener("mousedown", fora);
-    document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
-  }, [menu]);
   return (
     <div className="topbar">
-      <div className="row topbar-left" style={{ gap: 11, minWidth: 0 }}>
-        <div className="mobile-brand brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}><span className="brand-mark-txt" style={{ fontSize: 17 }}>R</span></div>
-        <div className="topbar-title hide-mobile" style={{ minWidth: 0 }}>
-          <h1 className="page-title">{title}</h1>
-          {sub && <p className="page-sub">{sub}</p>}
-        </div>
-      </div>
-
-      <div className="topbar-search hide-mobile">
-        <Icon name="search" size={18} color="var(--ink-3)" />
-        <input placeholder="Pesquisar transações, categorias…" aria-label="Pesquisar" />
-        <span className="kbd">⌘ K</span>
-      </div>
-
       <div className="topbar-actions">
-        {monthNav}
-        {onAdd && (
-          <button className="btn btn-primary" onClick={onAdd}>
-            <Icon name="plus" size={16} color="#fff" /> <span className="hide-mobile">{addLabel || tr("add_generic")}</span>
-          </button>
-        )}
-        {onToggleOcultar && (
-          <button className="icon-btn" onClick={onToggleOcultar} title={ocultar ? "Mostrar valores" : "Ocultar valores"} aria-pressed={ocultar}>
-            <Icon name={ocultar ? "eyeOff" : "eye"} size={18} />
-          </button>
-        )}
-        <button className="icon-btn hide-mobile" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title={tr("theme_title")}>
+        <button className="icon-btn hide-mobile" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Mudar tema">
           <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
         </button>
         <NotifBell />
-        <div className="topbar-userwrap" ref={wrapRef}>
-          <button className="topbar-user" onClick={() => setMenu((v) => !v)} aria-haspopup="menu" aria-expanded={menu} title={nome}>
-            <span className="tu-name hide-mobile">{nome}</span>
-            <span className={"tu-chev hide-mobile" + (menu ? " open" : "")}><Icon name="chevR" size={14} color="var(--ink-3)" /></span>
-            <span className="user-av tu-av">{iniciais}</span>
-          </button>
-          {menu && (
-            <div className="user-menu" role="menu">
-              <div className="user-menu-head">
-                <span className="user-av" style={{ width: 38, height: 38 }}>{iniciais}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div className="um-name">{nome}</div>
-                  {acc.email && <div className="um-mail">{acc.email}</div>}
-                </div>
-              </div>
-              <button className="user-menu-item" role="menuitem" onClick={() => { setMenu(false); go && go("perfil"); }}>
-                <Icon name="user" size={17} /> Perfil
-              </button>
-              <button className="user-menu-item danger" role="menuitem" onClick={() => { setMenu(false); onLogout && onLogout(); }}>
-                <Icon name="logout" size={17} /> Terminar sessão
-              </button>
-            </div>
-          )}
-        </div>
+        <button className="topbar-user" onClick={() => go && go("perfil")} title="Ver o meu perfil">
+          <span className="tu-name hide-mobile">{nome}</span>
+          <span className="user-av tu-av">{iniciais}</span>
+        </button>
       </div>
     </div>
   );
@@ -277,19 +221,19 @@ function Kpi({ label, value, sub, delta, deltaDir, icon, color, spark, onClick }
       style={onClick ? { cursor: "pointer" } : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}>
       <div className="kpi-top">
-        <div className="kpi-ico" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)` }}>
-          <Icon name={icon} size={19} color={color} sw={1.9} />
+        <div className="kpi-ico" style={{ background: color }}>
+          <Icon name={icon} size={19} color="#fff" sw={2} />
         </div>
         {spark && <Sparkline data={spark} color={color} />}
-        {!spark && delta != null && (
-          <span className={"delta " + (deltaDir === "down" ? "down" : "up")}>
-            <Icon name={deltaDir === "down" ? "arrowDown" : "arrowUp"} size={13} /> {delta}
-          </span>
-        )}
       </div>
       <div>
         <div className="kpi-label">{label}{onClick && <Icon name="chevR" size={13} color="var(--ink-3)" />}</div>
         <div className="kpi-val tnum valor-sensivel" style={{ marginTop: 6 }}>{value}</div>
+        {!spark && delta != null && (
+          <div className={"delta kpi-delta " + (deltaDir === "down" ? "down" : deltaDir === "flat" ? "flat" : "up")} style={{ marginTop: 9 }}>
+            {deltaDir !== "flat" && <Icon name={deltaDir === "down" ? "arrowDown" : "arrowUp"} size={13} />} {delta}
+          </div>
+        )}
         {sub && <div className="tiny muted" style={{ marginTop: 7, fontWeight: 600 }}>{sub}</div>}
       </div>
     </div>

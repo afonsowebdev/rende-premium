@@ -1189,3 +1189,32 @@ input.range::-moz-range-thumb { width: 19px; height: 19px; border-radius: 50%; b
 }
 .modal { border-radius: 14px; }
 .modal:hover { transform: none; box-shadow: var(--shadow-md); }
+
+/* ============================================================
+   RENDE+ · Cabeçalho slim + saudação no painel
+   ============================================================ */
+.topbar { justify-content: space-between; }
+.topbar-left { display: flex; align-items: center; flex: 0 0 auto; min-width: 0; }
+
+/* saudação do painel (corpo do dashboard) */
+.dash-hello { margin: 2px 0 22px; }
+.dash-hello-title { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 0; color: var(--ink); }
+.dash-hello-sub { margin: 5px 0 0; color: var(--ink-3); font-weight: 500; font-size: 14.5px; }
+@media (max-width: 560px){ .dash-hello-title { font-size: 22px; } }
+
+/* ============================================================
+   RENDE+ · Saudação com seletor de mês + delta por baixo do valor
+   ============================================================ */
+.dash-hello { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.dash-hello-text { min-width: 0; }
+
+.kpi-delta { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; }
+.kpi-delta svg { width: 13px; height: 13px; }
+
+@media (max-width: 560px){ .dash-hello { align-items: flex-start; } }
+
+/* ============================================================
+   RENDE+ · Cabeçalho sem logo (ações à direita) + delta neutro
+   ============================================================ */
+.topbar { justify-content: flex-end; }
+.delta.flat { color: var(--ink-3); }
