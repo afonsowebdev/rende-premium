@@ -360,14 +360,6 @@ function Dashboard({ go, open }) {
 
   return (
     <div className="content">
-      <div className="dash-hello">
-        <div className="dash-hello-text">
-          <h1 className="dash-hello-title">{primeiroNome ? "Olá, " + primeiroNome + "!" : "Olá!"}</h1>
-          <p className="dash-hello-sub">Aqui está o resumo das suas finanças.</p>
-        </div>
-        <MonthNav label={fin.monthLabel} onPrev={() => fin.shiftMonth(-1)} onNext={() => fin.shiftMonth(1)}
-          canNext={!fin.isCurrentMonth} isCurrent={fin.isCurrentMonth} onToday={fin.goToday} />
-      </div>
       <div className="grid kpi4" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
         <Kpi label="Saldo atual" value={BM.eur(fin.saldo)} icon="wallet" color="var(--accent)" delta={dProp(dSaldo)} deltaDir={dDir(dSaldo)} />
         <Kpi label={tr("kpi_received")} value={BM.eur(fin.totalRec)} icon="coins" color="var(--pos)" delta={dProp(dRec)} deltaDir={dDir(dRec)} onClick={() => setDetalhe("rec")} />
@@ -382,7 +374,7 @@ function Dashboard({ go, open }) {
             <div className="section-title">{tr("dash_evolution")}</div>
             <div className="row tiny" style={{ fontWeight: 700 }}>
               <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: "var(--accent)" }} /> {tr("legend_received")}</span>
-              <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: "var(--c-transporte)" }} /> {tr("legend_spent")}</span>
+              <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: "var(--neg)" }} /> {tr("legend_spent")}</span>
             </div>
           </div>
           <LineChart data={fin.series} height={232} />

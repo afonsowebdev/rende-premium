@@ -58,7 +58,7 @@ function DonutChart({ data, size = 168, thickness = 24, center }) {
   );
 }
 
-function LineChart({ data, height = 216, color = "var(--accent)", color2 = "var(--c-transporte)" }) {
+function LineChart({ data, height = 216, color = "var(--accent)", color2 = "var(--neg)" }) {
   const ref = React.useRef(null);
   const [w, setW] = React.useState(560);
   const [hi, setHi] = React.useState(null);
@@ -73,17 +73,16 @@ function LineChart({ data, height = 216, color = "var(--accent)", color2 = "var(
     return () => { if (ro) ro.disconnect(); else window.removeEventListener("resize", measure); };
   }, []);
 
-  const W = Math.max(260, w);              // largura real -> sem distorção (mesmo no telemóvel)
+  const W = Math.max(260, w);
   const mobile = W < 430;
   const H = mobile ? 200 : height;
-  const pad = { t: 18, r: 16, b: 28, l: 16 };
+  const pad = { t: 18, r: 16, b: 28, l: mobile ? 34 : 44 };
   const vals = data.flatMap((d) => [d.rec, d.gasto]);
   const max = (Math.max(...vals) || 1) * 1.14;
   const min = Math.min(0, ...vals);
   const x = (i) => pad.l + (i / (data.length - 1 || 1)) * (W - pad.l - pad.r);
   const y = (v) => pad.t + (1 - (v - min) / (max - min || 1)) * (H - pad.t - pad.b);
 
-  // curva suave (Catmull-Rom -> Bézier), sem distorcer os pontos reais
   const toPts = (sel) => data.map((d, i) => ({ x: x(i), y: y(d[sel]) }));
   const smooth = (P) => {
     if (P.length < 2) return P.length ? `M${P[0].x},${P[0].y}` : "";
@@ -101,34 +100,46 @@ function LineChart({ data, height = 216, color = "var(--accent)", color2 = "var(
   const base = H - pad.b;
   const recArea = recLine + ` L${x(data.length - 1).toFixed(1)},${base} L${x(0).toFixed(1)},${base} Z`;
   const fs = mobile ? 12 : 11.5;
-  const rRec = mobile ? 4 : 3.8, rGasto = mobile ? 3.4 : 3.2;
+
+  const ticks = mobile ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+  const fmtAxis = (v) => { const n = Math.round(v); if (n >= 1000) { const k = n / 1000; return "€" + (k % 1 === 0 ? k : k.toFixed(1)) + "K"; } return "€" + n; };
+  const lastRec = data.length ? { x: x(data.length - 1), y: y(data[data.length - 1].rec) } : null;
 
   return (
     <div ref={ref} style={{ width: "100%", position: "relative" }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: "block", overflow: "visible" }}>
         <defs>
           <linearGradient id="lg-rec" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.20" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.22" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
-        {[0, 0.5, 1].map((g, i) => {
+        {ticks.map((g, i) => {
           const gy = pad.t + g * (H - pad.t - pad.b);
-          return <line key={i} x1={pad.l} x2={W - pad.r} y1={gy} y2={gy} stroke="var(--border)" strokeWidth="1" strokeDasharray={g === 1 ? undefined : "3 6"} opacity={g === 1 ? 0.9 : 0.55} />;
+          const v = max - g * (max - min);
+          return (
+            <g key={i}>
+              <line x1={pad.l} x2={W - pad.r} y1={gy} y2={gy} stroke="var(--border)" strokeWidth="1" strokeDasharray={g === 1 ? undefined : "3 6"} opacity={g === 1 ? 0.9 : 0.5} />
+              <text x={pad.l - 8} y={gy + 3.5} textAnchor="end" fontSize={fs} fontWeight="600" fill="var(--ink-3)">{fmtAxis(v)}</text>
+            </g>
+          );
         })}
         <path className="lc-fade" d={recArea} fill="url(#lg-rec)" />
-        <path className="lc-fade" d={gastoLine} fill="none" stroke={color2} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1 7" opacity="0.9" />
+        <path className="lc-fade" d={gastoLine} fill="none" stroke={color2} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />
         <path className="lc-draw" pathLength="1" d={recLine} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         <g className="lc-fade">
           {data.map((d, i) => (
-            <g key={i}>
-              <circle cx={x(i)} cy={y(d.gasto)} r={rGasto} fill="var(--surface)" stroke={color2} strokeWidth="2" opacity="0.9" />
-              <circle cx={x(i)} cy={y(d.rec)} r={rRec} fill="var(--surface)" stroke={color} strokeWidth="2.4" />
-              <text x={x(i)} y={H - 8} textAnchor="middle" fontSize={fs} fontWeight="700" fill="var(--ink-3)">{d.m}</text>
-            </g>
+            <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize={fs} fontWeight="700" fill="var(--ink-3)">{d.m}</text>
           ))}
         </g>
+        {lastRec && <circle className="lc-fade" cx={lastRec.x} cy={lastRec.y} r="5" fill={color} stroke="var(--surface)" strokeWidth="2.5" />}
         {hi != null && <line x1={x(hi)} x2={x(hi)} y1={pad.t} y2={base} stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="3 4" opacity="0.45" />}
+        {hi != null && data[hi] && (
+          <g>
+            <circle cx={x(hi)} cy={y(data[hi].gasto)} r="4" fill={color2} stroke="var(--surface)" strokeWidth="2.5" />
+            <circle cx={x(hi)} cy={y(data[hi].rec)} r="4.5" fill={color} stroke="var(--surface)" strokeWidth="2.5" />
+          </g>
+        )}
         {data.map((d, i) => {
           const step = (W - pad.l - pad.r) / (data.length - 1 || 1);
           return <rect key={"hit" + i} x={x(i) - step / 2} y={pad.t} width={step} height={base - pad.t} fill="transparent" onMouseEnter={() => setHi(i)} onMouseLeave={() => setHi(null)} style={{ cursor: "pointer" }} />;

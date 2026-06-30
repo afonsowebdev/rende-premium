@@ -104,7 +104,7 @@ function MonthNav({ label, onPrev, onNext, canNext = true, isCurrent, onToday })
   const tr = useT();
   return (
     <div className="row" style={{ gap: 8 }}>
-      {!isCurrent && onToday && (
+      {onToday && (
         <button className="btn btn-soft" style={{ padding: "7px 12px" }} onClick={onToday}>{tr("month_current")}</button>
       )}
       <div className="seg" style={{ padding: 2 }}>
@@ -117,22 +117,37 @@ function MonthNav({ label, onPrev, onNext, canNext = true, isCurrent, onToday })
   );
 }
 
-function Topbar({ theme, setTheme, go }) {
-  const fin = useFinance();
-  const acc = fin.account || {};
-  const nome = acc.nome || "Conta";
-  const iniciais = (nome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("") || "R").toUpperCase();
+function Topbar({ title, sub, theme, setTheme, onLogout, onAdd, addLabel, monthNav, ocultar, onToggleOcultar }) {
+  const tr = useT();
   return (
     <div className="topbar">
+      <div className="row topbar-left" style={{ gap: 11, minWidth: 0 }}>
+        <div className="mobile-brand brand-mark" style={{ width: 34, height: 34, borderRadius: 10 }}><span className="brand-mark-txt" style={{ fontSize: 17 }}>R</span></div>
+        <div className="topbar-title" style={{ minWidth: 0 }}>
+          <h1 className="page-title">{title}</h1>
+          {sub && <p className="page-sub">{sub}</p>}
+        </div>
+      </div>
       <div className="topbar-actions">
+        {monthNav}
+        {onAdd && (
+          <button className="btn btn-primary" onClick={onAdd}>
+            <Icon name="plus" size={16} color="#fff" /> <span className="hide-mobile">{addLabel || tr("add_generic")}</span>
+          </button>
+        )}
+        {onToggleOcultar && (
+          <button className="icon-btn" onClick={onToggleOcultar} title={ocultar ? "Mostrar valores" : "Ocultar valores"} aria-pressed={ocultar}>
+            <Icon name={ocultar ? "eyeOff" : "eye"} size={18} />
+          </button>
+        )}
         <button className="icon-btn hide-mobile" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Mudar tema">
           <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
         </button>
-        <NotifBell />
-        <button className="topbar-user" onClick={() => go && go("perfil")} title="Ver o meu perfil">
-          <span className="tu-name hide-mobile">{nome}</span>
-          <span className="user-av tu-av">{iniciais}</span>
-        </button>
+        {onLogout && (
+          <button className="icon-btn" onClick={onLogout} title="Terminar sessão">
+            <Icon name="logout" size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

@@ -436,7 +436,8 @@ function Shell() {
 
   const P = PAGES[route];
   const titleByRoute = { dashboard: "lbl_dashboard", despesas: "lbl_expenses", rendimentos: "lbl_income", poupanca: "lbl_savings", perfil: "lbl_profile", contas: "lbl_accounts", relatorios: "lbl_reports", historico: "lbl_history", config: "lbl_settings" };
-  const pageTitle = PREM_PAGE[route] ? PREM_PAGE[route][0] : tr(titleByRoute[route] || "lbl_dashboard");
+  const primeiroNome = ((((fin.account && fin.account.nome) || "").trim().split(/\s+/)[0]) || "");
+  const pageTitle = PREM_PAGE[route] ? PREM_PAGE[route][0] : (route === "dashboard" ? (primeiroNome ? "Olá, " + primeiroNome + "!" : "Olá!") : tr(titleByRoute[route] || "lbl_dashboard"));
   const subByRoute = {
     dashboard: tfmt(tr("sub_dashboard"), { month: fin.monthLabel }),
     despesas: tfmt(tr("sub_despesas"), { month: fin.monthLabel }),

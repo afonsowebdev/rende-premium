@@ -1218,3 +1218,7 @@ input.range::-moz-range-thumb { width: 19px; height: 19px; border-radius: 50%; b
    ============================================================ */
 .topbar { justify-content: flex-end; }
 .delta.flat { color: var(--ink-3); }
+
+/* Cabeçalho estilo free: título à esquerda, ações à direita */
+.topbar { justify-content: space-between; }
+.topbar-title .page-title { font-size: 22px; }
