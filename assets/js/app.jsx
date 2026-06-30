@@ -480,8 +480,7 @@ function Shell() {
         {route === "previsao" && <Previsao />}
         {route === "premium" && <Paywall />}
       </div>
-      <MobileNav route={route} go={go} onMore={() => setMoreOpen(true)} />
-      {moreOpen && <MoreSheet route={route} go={go} onClose={() => setMoreOpen(false)} theme={theme} setTheme={setTheme} onLogout={fin.logout} />}
+      {moreOpen && false && <span />}
       {modal && <EntryModal type={modal.type} item={modal.item} onClose={() => setModal(null)} />}
       <LockGate active={!!fin.session} />
       {panel}
