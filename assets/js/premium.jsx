@@ -596,6 +596,116 @@ function grupoStats(g) {
   return { pessoas, total, aReceber: r2(aReceber), emDivida: r2(emDivida), emAberto: r2(emAberto), totalPago: r2(total - emAberto), saldo: r2(aReceber - emDivida), porLiquidar };
 }
 
+function dividas(g) {
+  const pessoas = ["Eu", ...(g.membros || [])];
+  const pares = {};
+  (g.despesas || []).forEach((e) => {
+    const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
+    const pagos = e.pagamentos || {};
+    parts.forEach((p) => {
+      if (p === e.pagador) return;
+      if (pagos[p]) return;
+      const key = p + "|" + e.pagador;
+      pares[key] = (pares[key] || 0) + quotaDe(e, p, parts);
+    });
+  });
+  return Object.keys(pares).map((k) => { const [de, para] = k.split("|"); return { de, para, valor: Math.round(pares[k] * 100) / 100 }; }).filter((x) => x.valor > 0.005);
+}
+function sysMsg(texto) { return { id: BM.uid(), tipo: "sistema", texto, ts: Date.now() }; }
+
+function ChatGrupo({ grupo, onSend }) {
+  const [txt, setTxt] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  const endRef = React.useRef(null);
+  const msgs = grupo.mensagens || [];
+  React.useEffect(() => { if (endRef.current) endRef.current.scrollIntoView({ block: "end" }); }, [msgs.length]);
+  const enviar = () => { const t = txt.trim(); if (!t) return; onSend({ id: BM.uid(), autor: "Eu", tipo: "texto", texto: t, ts: Date.now() }); setTxt(""); };
+  const anexar = async (fl) => { setErr(""); setBusy(true); try { for (const file of Array.from(fl)) { const a = await lerAnexo(file); onSend({ id: BM.uid(), autor: "Eu", tipo: /^image\//.test(a.tipo) ? "imagem" : "pdf", anexo: a, ts: Date.now() }); } } catch (m) { setErr(typeof m === "string" ? m : "Falha ao anexar."); } setBusy(false); };
+  return (
+    <div className="card pg-chat">
+      <div className="pg-chat-scroll">
+        {msgs.length === 0 && <div className="muted tiny" style={{ fontWeight: 600, textAlign: "center", padding: 24 }}>Ainda sem mensagens. Diz olá ao grupo 👋</div>}
+        {msgs.map((m) => {
+          if (m.tipo === "sistema") return <div className="pg-msg-sys" key={m.id}>{m.texto}</div>;
+          const mine = m.autor === "Eu";
+          return (
+            <div className={"pg-msg" + (mine ? " mine" : "")} key={m.id}>
+              {!mine && <span className="prem-avatar sm">{inicial(m.autor)}</span>}
+              <div className="pg-bubble">
+                {!mine && <div className="pg-msg-a">{m.autor}</div>}
+                {m.tipo === "texto" && <div className="pg-msg-t">{m.texto}</div>}
+                {m.tipo === "imagem" && <img src={m.anexo.dados} alt={m.anexo.nome} className="pg-msg-img" />}
+                {m.tipo === "pdf" && <a href={m.anexo.dados} download={m.anexo.nome} className="pg-msg-pdf"><Icon name="receipt" size={15} /> {m.anexo.nome}</a>}
+                <div className="pg-msg-time">{new Date(m.ts).toLocaleString("pt-PT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+      {err && <div className="muted tiny" style={{ color: "var(--neg)", fontWeight: 700, padding: "4px 12px" }}>{err}</div>}
+      <div className="pg-chat-bar">
+        <label className="pg-chat-attach" title="Anexar imagem ou PDF">
+          <input type="file" accept="image/*,application/pdf" multiple style={{ display: "none" }} onChange={(e) => { anexar(e.target.files); e.target.value = ""; }} />
+          <Icon name={busy ? "history" : "plus"} size={18} color="var(--ink-2)" />
+        </label>
+        <input className="input" value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); enviar(); } }} placeholder="Escreve uma mensagem…" />
+        <button className="btn btn-primary" style={{ flex: "none", padding: "9px 13px" }} onClick={enviar} title="Enviar"><Icon name="chevR" size={16} color="#fff" /></button>
+      </div>
+    </div>
+  );
+}
+
+function GrupoCalendario({ despesas }) {
+  const hoje = new Date();
+  const [ref, setRef] = React.useState({ y: hoje.getFullYear(), m: hoje.getMonth() });
+  const comVenc = (despesas || []).filter((e) => e.vencimento);
+  const first = new Date(ref.y, ref.m, 1);
+  const startDow = (first.getDay() + 6) % 7;
+  const dias = new Date(ref.y, ref.m + 1, 0).getDate();
+  const byDay = {};
+  const doMes = [];
+  comVenc.forEach((e) => { const p = e.vencimento.split("-").map(Number); if (p[0] === ref.y && p[1] - 1 === ref.m) { (byDay[p[2]] = byDay[p[2]] || []).push(e); doMes.push(e); } });
+  doMes.sort((x, y) => x.vencimento.localeCompare(y.vencimento));
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= dias; d++) cells.push(d);
+  const shift = (delta) => setRef((r) => { let m = r.m + delta, y = r.y; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } return { y, m }; });
+  const isHoje = (d) => hoje.getFullYear() === ref.y && hoje.getMonth() === ref.m && hoje.getDate() === d;
+  return (
+    <div className="pg-col">
+      <div className="card card-pad">
+        <div className="pg-cal-head">
+          <button className="pg-back" onClick={() => shift(-1)} title="Mês anterior"><span style={{ display: "grid", transform: "rotate(180deg)" }}><Icon name="chevR" size={15} /></span></button>
+          <b style={{ fontSize: 15 }}>{BM.MESES[ref.m]} {ref.y}</b>
+          <button className="pg-back" onClick={() => shift(1)} title="Mês seguinte"><Icon name="chevR" size={15} /></button>
+        </div>
+        <div className="pg-cal-grid pg-cal-dow">{["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => <span key={d}>{d}</span>)}</div>
+        <div className="pg-cal-grid">
+          {cells.map((d, i) => (
+            <div key={i} className={"pg-cal-cell" + (d ? "" : " empty") + (d && isHoje(d) ? " hoje" : "") + (d && byDay[d] ? " tem" : "")}>
+              {d && <span className="pg-cal-d">{d}</span>}
+              {d && byDay[d] && <span className="pg-cal-dot">{byDay[d].length}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card card-pad">
+        <div className="prem-sec-t">Vencimentos em {BM.MESES[ref.m]}</div>
+        {doMes.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600, marginTop: 4 }}>Sem vencimentos neste mês.</div> :
+          doMes.map((e) => (
+            <div className="pg-up" key={e.id}>
+              <div className="pg-up-d"><div className="dd">{e.vencimento.split("-")[2]}</div><div className="mm">{BM.MESES[ref.m]}</div></div>
+              <div className="pg-up-main"><div className="pg-up-t">{e.titulo} {estadoPill(e.estado)}</div><div className="pg-up-m">{(BM.cats[e.categoria] || BM.cats.outros).nome} · pago por {e.pagador}</div></div>
+              <div className="pg-up-v">{BM.eur(e.valor)}</div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 function Partilha() { return <PremiumGate><PartilhaInner /></PremiumGate>; }
 function PartilhaInner() {
   const prem = usePremium();
@@ -784,7 +894,7 @@ function PartilhaInner() {
                         {devedores.map((p) => {
                           const pago = !!pagos[p];
                           return <button type="button" key={p} className={"chip" + (pago ? " sel" : "")} style={{ cursor: "pointer" }} title={pago ? "Marcar como em dívida" : "Marcar como pago"}
-                            onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)) })}>{p}: {pago ? "pagou ✓" : BM.eur(quotaDe(e, p, parts)) + " deve"}</button>;
+                            onClick={() => { const desps = (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)); const patch = { despesas: desps }; if (!pago) patch.mensagens = [...(aberto.mensagens || []), sysMsg(p + " confirmou o pagamento de " + e.titulo)]; prem.edit("grupos", aberto.id, patch); }}>{p}: {pago ? "pagou ✓" : BM.eur(quotaDe(e, p, parts)) + " deve"}</button>;
                         })}
                       </div>
                     )}
@@ -794,15 +904,66 @@ function PartilhaInner() {
           </div>
         )}
 
-        {tab === "saldos" && (
-          <div className="card card-pad">
-            <div className="prem-sec-t">Quem recebe e quem paga</div>
-            {pessoas.map((p) => (
-              <div className="prem-balrow" key={p}><span className="prem-avatar">{inicial(p)}</span><span style={{ flex: 1, fontWeight: 700 }}>{p}{p === "Eu" ? <span className="muted tiny" style={{ fontWeight: 600 }}> (tu)</span> : null}</span>{balTag(net[p] || 0)}</div>
-            ))}
-            <div className="muted tiny" style={{ fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>Positivo = tens a receber · Negativo = tens a pagar. Marca os pagamentos na aba <b>Despesas</b> para os saldos atualizarem automaticamente.</div>
-          </div>
-        )}
+        {tab === "saldos" && (() => {
+          const ds = dividas(aberto);
+          const devemTe = ds.filter((d) => d.para === "Eu");
+          const deves = ds.filter((d) => d.de === "Eu");
+          const outros = ds.filter((d) => d.de !== "Eu" && d.para !== "Eu");
+          const acertar = (de, para) => prem.edit("grupos", aberto.id, {
+            despesas: (aberto.despesas || []).map((e) => { if (e.pagador !== para) return e; const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas; if (!parts.includes(de)) return e; return { ...e, pagamentos: { ...(e.pagamentos || {}), [de]: true } }; }),
+            mensagens: [...(aberto.mensagens || []), sysMsg((de === "Eu" ? "Eu" : de) + " acertou contas com " + (para === "Eu" ? "Eu" : para))],
+          });
+          return (
+            <div className="pg-col">
+              <div className="card card-pad">
+                <div className="prem-sec-t">O teu saldo</div>
+                <div className="pg-bal-hero">
+                  <div><div className="pg-bal-l">A receber</div><div className="pg-bal-v pos">{BM.eur(stats.aReceber)}</div></div>
+                  <div><div className="pg-bal-l">A pagar</div><div className="pg-bal-v neg">{BM.eur(stats.emDivida)}</div></div>
+                  <div><div className="pg-bal-l">Saldo</div><div className={"pg-bal-v " + (stats.saldo >= 0 ? "pos" : "neg")}>{(stats.saldo >= 0 ? "+ " : "− ") + BM.eur(Math.abs(stats.saldo))}</div></div>
+                </div>
+              </div>
+              <div className="card card-pad">
+                <div className="prem-sec-t">Devem-te</div>
+                {devemTe.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600, marginTop: 4 }}>Ninguém te deve nada. 🎉</div> :
+                  devemTe.map((d, i) => (
+                    <div className="pg-set" key={i}>
+                      <span className="prem-avatar sm">{inicial(d.de)}</span>
+                      <div className="pg-set-txt"><b>{d.de}</b> <span>deve-te</span></div>
+                      <span className="pg-set-amt pos">{BM.eur(d.valor)}</span>
+                      <button className="btn btn-soft" style={{ padding: "5px 11px" }} onClick={() => acertar(d.de, "Eu")}>Marcar recebido</button>
+                    </div>
+                  ))}
+              </div>
+              <div className="card card-pad">
+                <div className="prem-sec-t">Deves</div>
+                {deves.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600, marginTop: 4 }}>Não deves nada. 🎉</div> :
+                  deves.map((d, i) => (
+                    <div className="pg-set" key={i}>
+                      <span className="prem-avatar sm">{inicial(d.para)}</span>
+                      <div className="pg-set-txt"><span>deves a</span> <b>{d.para}</b></div>
+                      <span className="pg-set-amt neg">{BM.eur(d.valor)}</span>
+                      <button className="btn btn-primary" style={{ padding: "5px 11px" }} onClick={() => acertar("Eu", d.para)}>Pagar</button>
+                    </div>
+                  ))}
+              </div>
+              {outros.length > 0 && (
+                <div className="card card-pad">
+                  <div className="prem-sec-t">Entre outros membros</div>
+                  {outros.map((d, i) => (
+                    <div className="pg-set" key={i}>
+                      <span className="prem-avatar sm">{inicial(d.de)}</span>
+                      <div className="pg-set-txt"><b>{d.de}</b> <span>deve a</span> <b>{d.para}</b></div>
+                      <span className="pg-set-amt">{BM.eur(d.valor)}</span>
+                      <button className="btn btn-soft" style={{ padding: "5px 11px" }} onClick={() => acertar(d.de, d.para)}>Acertar</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="muted tiny" style={{ fontWeight: 600, lineHeight: 1.6 }}>"Acertar" marca as despesas correspondentes como pagas e atualiza os saldos automaticamente.</div>
+            </div>
+          );
+        })()}
 
         {tab === "membros" && (
           <div className="pg-col">
@@ -822,7 +983,7 @@ function PartilhaInner() {
                     <span className="prem-avatar">{inicial(m)}</span>
                     <div className="pg-mrow-txt"><b>{m}</b><span className="pg-mrow-sub">{conv ? conv.email : ""}{pendm ? " · convite pendente" : ""}</span></div>
                     {pendm
-                      ? <button className="btn btn-soft" style={{ padding: "5px 11px" }} onClick={() => prem.edit("grupos", aberto.id, { convites: (aberto.convites || []).map((c) => (c.nome === m ? { ...c, estado: "ativo" } : c)) })}>Aceitar</button>
+                      ? <button className="btn btn-soft" style={{ padding: "5px 11px" }} onClick={() => prem.edit("grupos", aberto.id, { convites: (aberto.convites || []).map((c) => (c.nome === m ? { ...c, estado: "ativo" } : c)), mensagens: [...(aberto.mensagens || []), sysMsg(m + " entrou no grupo")] })}>Aceitar</button>
                       : <select className="select pg-role-sel" value={papel} onChange={(e) => setPapel(m, e.target.value)}><option value="admin">Admin</option><option value="membro">Membro</option></select>}
                     <button className="icon-btn" title="Remover membro" onClick={() => setRemMembro(m)}><Icon name="trash" size={15} color="var(--neg)" /></button>
                   </div>
@@ -845,22 +1006,10 @@ function PartilhaInner() {
           </div>
         )}
 
-        {tab === "conversas" && (
-          <div className="card card-pad pg-soon big">
-            <div className="pg-soon-ic"><Icon name="bell" size={26} color="var(--accent)" /></div>
-            <b style={{ fontSize: 16 }}>Conversas do grupo</b>
-            <div className="muted" style={{ fontSize: 13, maxWidth: 430, margin: "6px auto 0", lineHeight: 1.6 }}>Um chat dentro do grupo (texto, imagens, PDFs e mensagens automáticas do sistema). Chega na <b>Fase 5</b> e funciona a sério com o backend ligado.</div>
-          </div>
-        )}
-        {tab === "calendario" && (
-          <div className="card card-pad pg-soon big">
-            <div className="pg-soon-ic"><Icon name="history" size={26} color="var(--accent)" /></div>
-            <b style={{ fontSize: 16 }}>Calendário</b>
-            <div className="muted" style={{ fontSize: 13, maxWidth: 430, margin: "6px auto 0", lineHeight: 1.6 }}>Vista de calendário com as despesas recorrentes e os vencimentos do grupo. Chega na <b>Fase 6</b>.</div>
-          </div>
-        )}
+        {tab === "conversas" && <ChatGrupo grupo={aberto} onSend={(m) => prem.edit("grupos", aberto.id, { mensagens: [...(aberto.mensagens || []), m] })} />}
+        {tab === "calendario" && <GrupoCalendario despesas={aberto.despesas} />}
 
-        {despModal && <DespesaPartilhadaModal grupo={aberto} onClose={() => setDespModal(null)} onSave={(d) => { prem.edit("grupos", aberto.id, { despesas: [...(aberto.despesas || []), d] }); setDespModal(null); }} />}
+        {despModal && <DespesaPartilhadaModal grupo={aberto} onClose={() => setDespModal(null)} onSave={(d) => { prem.edit("grupos", aberto.id, { despesas: [...(aberto.despesas || []), d], mensagens: [...(aberto.mensagens || []), sysMsg("Eu adicionou a despesa " + d.titulo + " (" + BM.eur(d.valor) + ")")] }); setDespModal(null); }} />}
         {anexoView && <AnexoViewer anexo={anexoView} onClose={() => setAnexoView(null)} />}
         {remMembro && (
           <Modal title="Remover membro" onClose={() => setRemMembro(null)}

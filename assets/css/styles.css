@@ -1585,3 +1585,57 @@ body.drawer-lock { overflow: hidden; }
   .ph-search { min-width: 100%; order: -1; }
   .ph-tool-add { flex: 1; justify-content: center; }
 }
+
+/* ============================================================
+   RENDE+ · Partilha — Fase 4 (saldos), 5 (chat), 6 (calendário)
+   ============================================================ */
+/* ---- Fase 4: acertar contas ---- */
+.pg-bal-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+.pg-bal-hero > div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px; }
+.pg-bal-l { font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.pg-bal-v { font-size: 18px; font-weight: 800; letter-spacing: -.02em; margin-top: 3px; }
+.pg-bal-v.pos { color: var(--pos); } .pg-bal-v.neg { color: var(--neg); }
+.pg-set { display: flex; align-items: center; gap: 11px; padding: 10px 0; border-top: 1px solid var(--border); }
+.pg-set:first-of-type { border-top: none; }
+.pg-set-txt { flex: 1; min-width: 0; font-size: 13px; color: var(--ink-2); }
+.pg-set-txt b { color: var(--ink); font-weight: 700; }
+.pg-set-amt { font-size: 14px; font-weight: 800; flex: none; }
+.pg-set-amt.pos { color: var(--pos); } .pg-set-amt.neg { color: var(--neg); }
+
+/* ---- Fase 5: chat ---- */
+.pg-chat { height: min(66vh, 560px); display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.pg-chat-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.pg-msg { display: flex; gap: 8px; align-items: flex-end; max-width: 100%; }
+.pg-msg.mine { justify-content: flex-end; }
+.pg-bubble { max-width: 78%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; padding: 8px 12px; }
+.pg-msg.mine .pg-bubble { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pg-msg-a { font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+.pg-msg-t { font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.pg-msg-img { max-width: 220px; border-radius: 10px; display: block; margin: 2px 0; }
+.pg-msg-pdf { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: inherit; text-decoration: underline; }
+.pg-msg-time { font-size: 10px; opacity: .7; margin-top: 3px; font-weight: 500; }
+.pg-msg.mine .pg-msg-time { text-align: right; }
+.pg-msg-sys { align-self: center; font-size: 11px; font-weight: 600; color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px; }
+.pg-chat-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface); }
+.pg-chat-attach { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: background .14s ease; }
+.pg-chat-attach:hover { background: var(--surface-2); }
+
+/* ---- Fase 6: calendário ---- */
+.pg-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.pg-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.pg-cal-dow { margin-bottom: 5px; }
+.pg-cal-dow span { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; }
+.pg-cal-cell { position: relative; aspect-ratio: 1; border-radius: 9px; display: flex; align-items: flex-start; justify-content: flex-start; padding: 5px 7px; border: 1px solid transparent; }
+.pg-cal-cell.empty { background: none; }
+.pg-cal-cell:not(.empty) { background: var(--surface-2); }
+.pg-cal-cell.tem { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.pg-cal-cell.hoje { border-color: var(--accent); }
+.pg-cal-d { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.pg-cal-cell.tem .pg-cal-d { color: var(--accent); }
+.pg-cal-dot { position: absolute; right: 5px; bottom: 5px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
+
+@media (max-width: 520px) {
+  .pg-bal-hero { grid-template-columns: 1fr; }
+  .pg-cal-cell { padding: 3px 5px; border-radius: 7px; }
+  .pg-cal-d { font-size: 11px; }
+}
