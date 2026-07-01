@@ -111,7 +111,7 @@ function MonthNav({ label, onPrev, onNext, canNext = true, isCurrent, onToday })
   );
 }
 
-function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOcultar, go, onMenu }) {
+function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOcultar, go, onMenu, menuOpen }) {
   const fin = useFinance();
   const acc = fin.account || {};
   const nome = acc.nome || "Conta";
@@ -129,8 +129,8 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
     <div className="topbar">
       <div className="row topbar-left" style={{ gap: 11, minWidth: 0 }}>
         {onMenu && (
-          <button className="menu-btn" onClick={onMenu} aria-label="Abrir menu" title="Abrir menu">
-            <Icon name="menu" size={23} />
+          <button className={"menu-btn" + (menuOpen ? " open" : "")} onClick={onMenu} aria-label="Abrir menu" aria-expanded={!!menuOpen} title="Menu">
+            <span className="hamb" aria-hidden="true"><i></i><i></i><i></i></span>
           </button>
         )}
         <div className="topbar-title hide-mobile" style={{ minWidth: 0 }}>
@@ -139,9 +139,9 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
         </div>
       </div>
       {onMenu && (
-        <button className="topbar-logo show-mobile" onClick={onMenu} aria-label="Abrir menu" title="Abrir menu">
+        <div className="topbar-logo show-mobile" aria-hidden="true">
           <Brand nameColor="var(--ink)" />
-        </button>
+        </div>
       )}
       <div className="topbar-actions">
         {onToggleOcultar && (
@@ -294,7 +294,7 @@ function MobileNav({ route, go, onAdd }) {
           ? (acc.foto
               ? <img src={acc.foto} alt="" className={"mtab-av" + (on ? " on" : "")} />
               : <span className={"mtab-av mtab-av-ph" + (on ? " on" : "")}>{inicial}</span>)
-          : <Icon name={t.icon} size={21} sw={on ? 2.2 : 1.8} />}
+          : <Icon name={t.icon} size={24} sw={on ? 2.2 : 1.8} />}
         <span>{t.label}</span>
       </button>
     );
@@ -303,7 +303,7 @@ function MobileNav({ route, go, onAdd }) {
     <nav className="mobilenav">
       {Tab({ id: "dashboard", label: "Início", icon: "grid" })}
       {Tab({ id: "despesas", label: "Despesas", icon: "card" })}
-      <button className="mtab-fab" onClick={onAdd} aria-label="Adicionar"><Icon name="plus" size={26} color="#fff" sw={2.4} /></button>
+      <button className="mtab-fab" onClick={onAdd} aria-label="Adicionar"><Icon name="plus" size={28} color="#fff" sw={2.4} /></button>
       {Tab({ id: "rendimentos", label: "Receita", icon: "coins" })}
       {Tab({ id: "perfil", label: "Perfil", icon: "user" })}
     </nav>

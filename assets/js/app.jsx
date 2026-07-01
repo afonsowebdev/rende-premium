@@ -457,7 +457,7 @@ function Shell() {
       <Sidebar route={route} go={go} account={fin.account} collapsed={sbCollapsed} onToggle={toggleSidebar} onLogout={fin.logout} />
       <div className="main">
         <Topbar go={go} title={pageTitle} sub={PREM_PAGE[route] ? PREM_PAGE[route][1] : subByRoute[route]} theme={theme} setTheme={setTheme} onLogout={fin.logout}
-          ocultar={ocultar} onToggleOcultar={toggleOcultar} onMenu={() => setDrawerOpen(true)} />
+          ocultar={ocultar} onToggleOcultar={toggleOcultar} onMenu={() => setDrawerOpen(true)} menuOpen={drawerOpen} />
         {(showMonthNav || P.add) && (
           <div className="page-actions">
             {showMonthNav && <MonthNav label={fin.monthLabel} onPrev={() => fin.shiftMonth(-1)} onNext={() => fin.shiftMonth(1)}
