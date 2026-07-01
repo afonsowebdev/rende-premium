@@ -447,6 +447,30 @@ function balTag(v) {
   return <span className={"prem-bal-tag " + (v > 0 ? "pos" : "neg")}>{(v > 0 ? "recebe " : "deve ") + BM.eur(Math.abs(v))}</span>;
 }
 
+function grupoStats(g) {
+  const pessoas = ["Eu", ...(g.membros || [])];
+  const desp = g.despesas || [];
+  const total = desp.reduce((s, e) => s + (+e.valor || 0), 0);
+  let aReceber = 0, emDivida = 0, emAberto = 0, porLiquidar = 0;
+  desp.forEach((e) => {
+    const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
+    const share = parts.length ? (+e.valor || 0) / parts.length : 0;
+    const pagos = e.pagamentos || {};
+    let aberta = false;
+    parts.forEach((p) => {
+      if (p === e.pagador) return;
+      if (pagos[p]) return;
+      aberta = true;
+      emAberto += share;
+      if (e.pagador === "Eu") aReceber += share;
+      if (p === "Eu") emDivida += share;
+    });
+    if (aberta) porLiquidar++;
+  });
+  const r2 = (n) => Math.round(n * 100) / 100;
+  return { pessoas, total, aReceber: r2(aReceber), emDivida: r2(emDivida), emAberto: r2(emAberto), totalPago: r2(total - emAberto), saldo: r2(aReceber - emDivida), porLiquidar };
+}
+
 function Partilha() { return <PremiumGate><PartilhaInner /></PremiumGate>; }
 function PartilhaInner() {
   const prem = usePremium();
@@ -454,93 +478,202 @@ function PartilhaInner() {
   const [modal, setModal] = React.useState(false);
   const [despModal, setDespModal] = React.useState(null);
   const [openId, setOpenId] = React.useState(null);
+  const [tab, setTab] = React.useState("dashboard");
   const [delId, setDelId] = React.useState(null);
   const [convEmail, setConvEmail] = React.useState("");
   const aberto = grupos.find((g) => g.id === openId);
 
   if (aberto) {
+    const stats = grupoStats(aberto);
     const net = balancos(aberto);
-    const pessoas = ["Eu", ...(aberto.membros || [])];
-    const total = (aberto.despesas || []).reduce((s, e) => s + (+e.valor || 0), 0);
+    const pessoas = stats.pessoas;
     const desp = [...(aberto.despesas || [])].sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+    const pend = (aberto.convites || []).filter((c) => c.estado === "pendente").length;
+    const pctPago = stats.total > 0 ? Math.round((stats.totalPago / stats.total) * 100) : 0;
+    const convidar = () => { const v = convEmail.trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(v)) return; const nm = nomeDeEmail(v); if (!(aberto.membros || []).includes(nm)) prem.edit("grupos", aberto.id, { membros: [...(aberto.membros || []), nm], convites: [...(aberto.convites || []), { email: v, nome: nm, estado: "pendente" }] }); setConvEmail(""); };
+    const kpis = [
+      { lbl: "Total de despesas", val: BM.eur(stats.total), sub: "total do grupo", ic: "wallet", c: "#14a06b" },
+      { lbl: "Total pago", val: BM.eur(stats.totalPago), sub: pctPago + "% liquidado", ic: "check", c: "#3b82f6" },
+      { lbl: "Em dívida", val: BM.eur(stats.emDivida), sub: "o que deves", ic: "arrowDown", c: "#e5484d", tone: "neg" },
+      { lbl: "A receber", val: BM.eur(stats.aReceber), sub: "o que te devem", ic: "arrowUp", c: "#14a06b", tone: "pos" },
+      { lbl: "Saldo pessoal", val: (stats.saldo >= 0 ? "+ " : "− ") + BM.eur(Math.abs(stats.saldo)), sub: stats.saldo >= 0 ? "estás a receber" : "tens a pagar", ic: "trend", c: "#0e8659", tone: stats.saldo >= 0 ? "pos" : "neg" },
+      { lbl: "Membros", val: String(pessoas.length), sub: pend ? pend + " convite(s) pendente(s)" : "todos ativos", ic: "users", c: "#a855f7" },
+      { lbl: "Por liquidar", val: String(stats.porLiquidar), sub: "despesas em aberto", ic: "receipt", c: "#d9840a" },
+    ];
+    const TABS = [
+      { id: "dashboard", label: "Dashboard", ic: "grid" },
+      { id: "despesas", label: "Despesas", ic: "receipt" },
+      { id: "saldos", label: "Saldos", ic: "trend" },
+      { id: "membros", label: "Membros", ic: "users" },
+      { id: "conversas", label: "Conversas", ic: "bell", soon: "Fase 5" },
+      { id: "calendario", label: "Calendário", ic: "history", soon: "Fase 6" },
+    ];
     return (
       <div className="content">
-        <div className="row" style={{ gap: 10 }}>
-          <button className="btn btn-ghost" onClick={() => setOpenId(null)}><span style={{ display: "grid", transform: "rotate(180deg)" }}><Icon name="chevR" size={15} /></span> Voltar</button>
-          <button className="btn btn-primary" style={{ marginLeft: "auto" }} onClick={() => setDespModal(aberto)}><Icon name="plus" size={15} color="#fff" /> Nova despesa</button>
-        </div>
-        <div className="card card-pad">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div><b style={{ fontSize: 17 }}>{aberto.nome}</b><div className="tiny muted" style={{ marginTop: 2 }}>{pessoas.join(" · ")}</div></div>
-            <div style={{ textAlign: "right" }}><div className="tiny muted" style={{ fontWeight: 700 }}>Total gasto</div><div className="tnum" style={{ fontWeight: 700, fontSize: 19 }}>{BM.eur(total)}</div></div>
+        <div className="card pg-head">
+          <button className="pg-back" onClick={() => setOpenId(null)} title="Voltar aos grupos"><span style={{ display: "grid", transform: "rotate(180deg)" }}><Icon name="chevR" size={16} /></span></button>
+          <span className="pg-head-ic"><Icon name="users" size={20} color="#fff" /></span>
+          <div className="pg-head-txt"><b className="pg-head-name">{aberto.nome}</b><div className="tiny muted">{pessoas.length} membros{pend ? " · " + pend + " pendente(s)" : ""}</div></div>
+          <div className="pg-avatars">
+            {pessoas.slice(0, 4).map((p) => <span className="prem-avatar sm" key={p} title={p}>{inicial(p)}</span>)}
+            {pessoas.length > 4 && <span className="prem-avatar more sm">+{pessoas.length - 4}</span>}
           </div>
+          <button className="btn btn-primary pg-add" onClick={() => setDespModal(aberto)}><Icon name="plus" size={15} color="#fff" /> Nova despesa</button>
         </div>
-        <div className="card card-pad">
-          <div className="prem-sec-t">Quem recebe e quem paga</div>
-          {pessoas.map((p) => (
-            <div className="prem-balrow" key={p}>
-              <span className="prem-avatar">{inicial(p)}</span>
-              <span style={{ flex: 1, fontWeight: 700 }}>{p}</span>
-              {balTag(net[p] || 0)}
-            </div>
+
+        <div className="pg-tabs">
+          {TABS.map((t) => (
+            <button key={t.id} className={"pg-tab" + (tab === t.id ? " on" : "")} onClick={() => setTab(t.id)}>
+              <Icon name={t.ic} size={16} /> {t.label}{t.soon && <span className="pg-soon-tag">{t.soon}</span>}
+            </button>
           ))}
         </div>
-        <div className="card card-pad">
-          <div className="prem-sec-t">Membros</div>
-          <div className="prem-balrow">
-            <span className="prem-avatar">Eu</span>
-            <span style={{ flex: 1, fontWeight: 700 }}>Eu <span className="muted tiny" style={{ fontWeight: 600 }}>(tu)</span></span>
-            <span className="prem-bal-tag zero">ativo</span>
-          </div>
-          {(aberto.membros || []).map((m) => {
-            const conv = (aberto.convites || []).find((c) => c.nome === m);
-            const pend = conv && conv.estado === "pendente";
-            return (
-              <div className="prem-balrow" key={m}>
-                <span className="prem-avatar">{inicial(m)}</span>
-                <span style={{ flex: 1, fontWeight: 700 }}>{m}{conv ? <span className="muted tiny" style={{ fontWeight: 600 }}> · {conv.email}</span> : null}</span>
-                {pend
-                  ? <button className="btn btn-soft" style={{ padding: "4px 10px" }} onClick={() => prem.edit("grupos", aberto.id, { convites: (aberto.convites || []).map((c) => (c.nome === m ? { ...c, estado: "ativo" } : c)) })}>Aceitar convite</button>
-                  : <span className="prem-bal-tag zero">ativo</span>}
+
+        {tab === "dashboard" && (<>
+          <div className="pg-kpis">
+            {kpis.map((k, i) => (
+              <div className="card pg-kpi" key={i}>
+                <div className="pg-kpi-top"><span className="pg-kpi-lbl">{k.lbl}</span><span className="pg-kpi-ic" style={{ background: k.c }}><Icon name={k.ic} size={15} color="#fff" /></span></div>
+                <div className={"pg-kpi-val" + (k.tone ? " " + k.tone : "")}>{k.val}</div>
+                <div className="pg-kpi-sub">{k.sub}</div>
               </div>
-            );
-          })}
-          <div className="row" style={{ gap: 8, marginTop: 12 }}>
-            <input className="input" type="email" value={convEmail} onChange={(e) => setConvEmail(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = convEmail.trim().toLowerCase(); if (/^\S+@\S+\.\S+$/.test(v)) { const nm = nomeDeEmail(v); if (!(aberto.membros || []).includes(nm)) prem.edit("grupos", aberto.id, { membros: [...(aberto.membros || []), nm], convites: [...(aberto.convites || []), { email: v, nome: nm, estado: "pendente" }] }); setConvEmail(""); } } }}
-              placeholder="convidar por email…" />
-            <button className="btn btn-primary" style={{ flex: "none" }} onClick={() => { const v = convEmail.trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(v)) return; const nm = nomeDeEmail(v); if (!(aberto.membros || []).includes(nm)) prem.edit("grupos", aberto.id, { membros: [...(aberto.membros || []), nm], convites: [...(aberto.convites || []), { email: v, nome: nm, estado: "pendente" }] }); setConvEmail(""); }}><Icon name="plus" size={14} color="#fff" /> Convidar</button>
+            ))}
           </div>
-          <div className="muted tiny" style={{ fontWeight: 600, marginTop: 8 }}>Simulação local: o convite real por email (com link) entra na fase de unificação do backend.</div>
-        </div>
-        <div className="card card-pad">
-          <div className="prem-sec-t">Despesas</div>
-          {desp.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>Ainda sem despesas. Adiciona a primeira.</div> :
-            desp.map((e) => {
-              const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
-              const pagos = e.pagamentos || {};
-              const devedores = parts.filter((p) => p !== e.pagador);
-              return (
-                <div key={e.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <div className="prem-row" style={{ borderBottom: "none" }}>
-                    <span className="prem-rico sm"><Icon name="receipt" size={17} color="var(--ink-2)" /></span>
-                    <div className="prem-rtxt"><b>{e.titulo}</b><span className="muted" style={{ fontSize: 12 }}>{e.data ? BM.fmtData(e.data) + " · " : ""}Pagou {e.pagador} · ÷ {parts.length} = {BM.eur((+e.valor || 0) / parts.length)}</span></div>
-                    <div className="prem-ramt">{BM.eur(e.valor)}</div>
-                    <div className="prem-rbtns"><button className="icon-btn" title="Apagar despesa" onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).filter((x) => x.id !== e.id) })}><Icon name="trash" size={15} color="var(--neg)" /></button></div>
-                  </div>
-                  {devedores.length > 0 && (
-                    <div className="row" style={{ gap: 6, flexWrap: "wrap", padding: "0 14px 12px 52px" }}>
-                      {devedores.map((p) => {
-                        const pago = !!pagos[p];
-                        return <button type="button" key={p} className={"chip" + (pago ? " sel" : "")} style={{ cursor: "pointer" }} title={pago ? "Marcar como em dívida" : "Marcar como pago"}
-                          onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)) })}>{p}: {pago ? "pagou ✓" : "deve"}</button>;
-                      })}
+          <div className="pg-grid">
+            <div className="pg-col">
+              <div className="card card-pad">
+                <div className="pg-sec-h"><div className="prem-sec-t">Despesas recentes</div>{desp.length > 5 && <button className="pg-link" onClick={() => setTab("despesas")}>Ver todas</button>}</div>
+                {desp.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>Ainda sem despesas. Adiciona a primeira.</div> :
+                  desp.slice(0, 5).map((e) => {
+                    const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
+                    return (
+                      <div className="pg-exp" key={e.id}>
+                        <span className="pg-exp-ic"><Icon name="receipt" size={17} color="var(--accent)" /></span>
+                        <div className="pg-exp-main"><div className="pg-exp-t">{e.titulo}</div><div className="pg-exp-m">{e.data ? BM.fmtData(e.data) + " · " : ""}Pagou {e.pagador} · ÷{parts.length}</div></div>
+                        <div className="pg-exp-v">{BM.eur(e.valor)}</div>
+                      </div>
+                    );
+                  })}
+              </div>
+              <div className="card card-pad pg-soon">
+                <div className="prem-sec-t">Próximas despesas</div>
+                <div className="pg-soon-b"><Icon name="history" size={18} color="var(--ink-3)" /><span>Vencimentos e recorrentes do grupo chegam com o novo formulário de despesa na <b>Fase 2</b>.</span></div>
+              </div>
+              <div className="card card-pad">
+                <div className="prem-sec-t">Atividade do grupo</div>
+                {desp.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>Ainda sem atividade.</div> :
+                  <div className="pg-tl">
+                    {desp.slice(0, 6).map((e) => (
+                      <div className="pg-tli" key={e.id}>
+                        <span className="pg-tli-ic"><Icon name="plus" size={13} color="var(--accent)" /></span>
+                        <div><div className="pg-tli-txt"><b>{e.pagador}</b> adicionou <b>{e.titulo}</b> ({BM.eur(e.valor)})</div><div className="pg-tli-time">{e.data ? BM.fmtData(e.data) : ""}</div></div>
+                      </div>
+                    ))}
+                  </div>}
+              </div>
+            </div>
+            <div className="pg-col">
+              <div className="card card-pad">
+                <div className="pg-sec-h"><div className="prem-sec-t">Saldos entre membros</div><button className="pg-link" onClick={() => setTab("saldos")}>Detalhe</button></div>
+                {pessoas.map((p) => (
+                  <div className="prem-balrow" key={p}><span className="prem-avatar">{inicial(p)}</span><span style={{ flex: 1, fontWeight: 700 }}>{p}</span>{balTag(net[p] || 0)}</div>
+                ))}
+              </div>
+              <div className="card card-pad pg-soon">
+                <div className="prem-sec-t">Despesas por categoria</div>
+                <div className="pg-soon-b"><Icon name="piechart" size={18} color="var(--ink-3)" /><span>O gráfico por categoria aparece quando as despesas passarem a ter categoria, na <b>Fase 2</b>.</span></div>
+              </div>
+            </div>
+          </div>
+        </>)}
+
+        {tab === "despesas" && (
+          <div className="card card-pad">
+            <div className="pg-sec-h"><div className="prem-sec-t">Despesas</div><button className="btn btn-soft" style={{ padding: "6px 12px" }} onClick={() => setDespModal(aberto)}><Icon name="plus" size={14} /> Nova</button></div>
+            {desp.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>Ainda sem despesas. Adiciona a primeira.</div> :
+              desp.map((e) => {
+                const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
+                const pagos = e.pagamentos || {};
+                const devedores = parts.filter((p) => p !== e.pagador);
+                return (
+                  <div key={e.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <div className="prem-row" style={{ borderBottom: "none" }}>
+                      <span className="prem-rico sm"><Icon name="receipt" size={17} color="var(--ink-2)" /></span>
+                      <div className="prem-rtxt"><b>{e.titulo}</b><span className="muted" style={{ fontSize: 12 }}>{e.data ? BM.fmtData(e.data) + " · " : ""}Pagou {e.pagador} · ÷ {parts.length} = {BM.eur((+e.valor || 0) / parts.length)}</span></div>
+                      <div className="prem-ramt">{BM.eur(e.valor)}</div>
+                      <div className="prem-rbtns"><button className="icon-btn" title="Apagar despesa" onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).filter((x) => x.id !== e.id) })}><Icon name="trash" size={15} color="var(--neg)" /></button></div>
                     </div>
-                  )}
+                    {devedores.length > 0 && (
+                      <div className="row" style={{ gap: 6, flexWrap: "wrap", padding: "0 14px 12px 52px" }}>
+                        {devedores.map((p) => {
+                          const pago = !!pagos[p];
+                          return <button type="button" key={p} className={"chip" + (pago ? " sel" : "")} style={{ cursor: "pointer" }} title={pago ? "Marcar como em dívida" : "Marcar como pago"}
+                            onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)) })}>{p}: {pago ? "pagou ✓" : "deve"}</button>;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {tab === "saldos" && (
+          <div className="card card-pad">
+            <div className="prem-sec-t">Quem recebe e quem paga</div>
+            {pessoas.map((p) => (
+              <div className="prem-balrow" key={p}><span className="prem-avatar">{inicial(p)}</span><span style={{ flex: 1, fontWeight: 700 }}>{p}{p === "Eu" ? <span className="muted tiny" style={{ fontWeight: 600 }}> (tu)</span> : null}</span>{balTag(net[p] || 0)}</div>
+            ))}
+            <div className="muted tiny" style={{ fontWeight: 600, marginTop: 10, lineHeight: 1.6 }}>Positivo = tens a receber · Negativo = tens a pagar. Marca os pagamentos na aba <b>Despesas</b> para os saldos atualizarem automaticamente.</div>
+          </div>
+        )}
+
+        {tab === "membros" && (
+          <div className="card card-pad">
+            <div className="prem-sec-t">Membros</div>
+            <div className="prem-balrow">
+              <span className="prem-avatar">Eu</span>
+              <span style={{ flex: 1, fontWeight: 700 }}>Eu <span className="muted tiny" style={{ fontWeight: 600 }}>(tu · Owner)</span></span>
+              <span className="prem-bal-tag zero">ativo</span>
+            </div>
+            {(aberto.membros || []).map((m) => {
+              const conv = (aberto.convites || []).find((c) => c.nome === m);
+              const pendm = conv && conv.estado === "pendente";
+              return (
+                <div className="prem-balrow" key={m}>
+                  <span className="prem-avatar">{inicial(m)}</span>
+                  <span style={{ flex: 1, fontWeight: 700 }}>{m}{conv ? <span className="muted tiny" style={{ fontWeight: 600 }}> · {conv.email}</span> : null}</span>
+                  {pendm
+                    ? <button className="btn btn-soft" style={{ padding: "4px 10px" }} onClick={() => prem.edit("grupos", aberto.id, { convites: (aberto.convites || []).map((c) => (c.nome === m ? { ...c, estado: "ativo" } : c)) })}>Aceitar convite</button>
+                    : <span className="prem-bal-tag zero">ativo</span>}
                 </div>
               );
             })}
-        </div>
+            <div className="row" style={{ gap: 8, marginTop: 12 }}>
+              <input className="input" type="email" value={convEmail} onChange={(e) => setConvEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); convidar(); } }}
+                placeholder="convidar por email…" />
+              <button className="btn btn-primary" style={{ flex: "none" }} onClick={convidar}><Icon name="plus" size={14} color="#fff" /> Convidar</button>
+            </div>
+            <div className="muted tiny" style={{ fontWeight: 600, marginTop: 8, lineHeight: 1.6 }}>Permissões (Owner / Admin / Membro) e o convite real por email chegam na <b>Fase 3</b>. Aqui é simulação local.</div>
+          </div>
+        )}
+
+        {tab === "conversas" && (
+          <div className="card card-pad pg-soon big">
+            <div className="pg-soon-ic"><Icon name="bell" size={26} color="var(--accent)" /></div>
+            <b style={{ fontSize: 16 }}>Conversas do grupo</b>
+            <div className="muted" style={{ fontSize: 13, maxWidth: 430, margin: "6px auto 0", lineHeight: 1.6 }}>Um chat dentro do grupo (texto, imagens, PDFs e mensagens automáticas do sistema). Chega na <b>Fase 5</b> e funciona a sério com o backend ligado.</div>
+          </div>
+        )}
+        {tab === "calendario" && (
+          <div className="card card-pad pg-soon big">
+            <div className="pg-soon-ic"><Icon name="history" size={26} color="var(--accent)" /></div>
+            <b style={{ fontSize: 16 }}>Calendário</b>
+            <div className="muted" style={{ fontSize: 13, maxWidth: 430, margin: "6px auto 0", lineHeight: 1.6 }}>Vista de calendário com as despesas recorrentes e os vencimentos do grupo. Chega na <b>Fase 6</b>.</div>
+          </div>
+        )}
+
         {despModal && <DespesaPartilhadaModal grupo={aberto} onClose={() => setDespModal(null)} onSave={(d) => { prem.edit("grupos", aberto.id, { despesas: [...(aberto.despesas || []), d] }); setDespModal(null); }} />}
       </div>
     );
@@ -574,7 +707,7 @@ function PartilhaInner() {
                   <span className="tiny muted" style={{ fontWeight: 700 }}>Total · {BM.eur(total)}</span>
                   {balTag(meu)}
                 </div>
-                <button className="btn btn-soft" style={{ marginTop: 12, width: "100%", justifyContent: "center" }} onClick={() => setOpenId(g.id)}>Abrir grupo</button>
+                <button className="btn btn-soft" style={{ marginTop: 12, width: "100%", justifyContent: "center" }} onClick={() => { setTab("dashboard"); setOpenId(g.id); }}>Abrir grupo</button>
               </div>
             );
           })}
