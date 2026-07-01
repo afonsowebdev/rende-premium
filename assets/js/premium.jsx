@@ -385,19 +385,83 @@ function GrupoModal({ onClose, onSave }) {
     </Modal>
   );
 }
+const ESTADOS = [{ id: "pendente", label: "Pendente" }, { id: "pago", label: "Pago" }, { id: "confirmado", label: "Confirmado" }];
+function estadoPill(estado) {
+  const map = { pendente: ["pend", "Pendente"], pago: ["pago", "Pago"], confirmado: ["conf", "Confirmado"] };
+  const [cls, lbl] = map[estado || "pendente"] || map.pendente;
+  return <span className={"pg-estado " + cls}>{lbl}</span>;
+}
+function lerAnexo(file) {
+  return new Promise((resolve, reject) => {
+    if (file.type === "application/pdf") {
+      if (file.size > 2.4 * 1024 * 1024) return reject("PDF demasiado grande (máx. ~2,4 MB nesta versão local).");
+      const r = new FileReader();
+      r.onload = () => resolve({ nome: file.name, tipo: file.type, dados: r.result });
+      r.onerror = () => reject("Não consegui ler o ficheiro.");
+      r.readAsDataURL(file);
+    } else if (/^image\//.test(file.type)) {
+      const r = new FileReader();
+      r.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const max = 1280; let w = img.width, h = img.height;
+          if (w > max || h > max) { const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+          const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve({ nome: file.name, tipo: "image/jpeg", dados: cv.toDataURL("image/jpeg", 0.82) });
+        };
+        img.onerror = () => reject("Imagem inválida.");
+        img.src = r.result;
+      };
+      r.onerror = () => reject("Não consegui ler a imagem.");
+      r.readAsDataURL(file);
+    } else { reject("Só imagens ou PDF."); }
+  });
+}
+function AnexoViewer({ anexo, onClose }) {
+  return (
+    <Modal title={anexo.nome || "Anexo"} onClose={onClose}
+      footer={<><a className="btn btn-soft" href={anexo.dados} download={anexo.nome || "anexo"}>Transferir</a><button className="btn btn-primary" onClick={onClose}>Fechar</button></>}>
+      {/^image\//.test(anexo.tipo)
+        ? <img src={anexo.dados} alt={anexo.nome} style={{ width: "100%", borderRadius: 10, display: "block" }} />
+        : <iframe title={anexo.nome} src={anexo.dados} style={{ width: "100%", height: "60vh", border: "1px solid var(--border)", borderRadius: 10 }} />}
+    </Modal>
+  );
+}
 function DespesaPartilhadaModal({ grupo, onClose, onSave }) {
   const pessoas = ["Eu", ...(grupo.membros || [])];
-  const [f, setF] = React.useState({ titulo: "", valor: "", data: BM.todayISO(), pagador: "Eu" });
+  const [f, setF] = React.useState({ titulo: "", categoria: "outros", valor: "", data: BM.todayISO(), vencimento: "", pagador: "Eu", estado: "pendente", obs: "" });
   const [parts, setParts] = React.useState(() => pessoas.slice());
+  const [metodo, setMetodo] = React.useState("igual");
+  const [pcts, setPcts] = React.useState({});
+  const [vals, setVals] = React.useState({});
+  const [anexos, setAnexos] = React.useState([]);
   const [err, setErr] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
   const toggle = (p) => setParts((arr) => arr.includes(p) ? arr.filter((x) => x !== p) : [...arr, p]);
-  const porPessoa = parts.length ? numOf(f.valor) / parts.length : 0;
+  const valor = numOf(f.valor);
+  const quotas = {};
+  if (metodo === "igual") { const each = parts.length ? valor / parts.length : 0; parts.forEach((p) => (quotas[p] = each)); }
+  else if (metodo === "percentagem") { parts.forEach((p) => (quotas[p] = valor * (numOf(pcts[p]) / 100))); }
+  else { parts.forEach((p) => (quotas[p] = numOf(vals[p]))); }
+  const somaQuotas = parts.reduce((s, p) => s + (quotas[p] || 0), 0);
+  const somaPct = parts.reduce((s, p) => s + numOf(pcts[p]), 0);
+  const diff = Math.round((somaQuotas - valor) * 100) / 100;
+  const addFiles = async (fileList) => {
+    setErr(""); setBusy(true);
+    try { const novos = []; for (const file of Array.from(fileList)) novos.push(await lerAnexo(file)); setAnexos((a) => [...a, ...novos]); }
+    catch (msg) { setErr(typeof msg === "string" ? msg : "Falha ao anexar."); }
+    setBusy(false);
+  };
   const guardar = () => {
     if (!f.titulo.trim()) return setErr("Dá um nome à despesa.");
-    if (numOf(f.valor) <= 0) return setErr("Indica um valor válido.");
-    if (parts.length === 0) return setErr("Escolhe quem divide a despesa.");
-    onSave({ id: BM.uid(), titulo: f.titulo.trim(), valor: numOf(f.valor), data: f.data, pagador: f.pagador, participantes: parts, pagamentos: {} });
+    if (valor <= 0) return setErr("Indica um valor válido.");
+    if (parts.length === 0) return setErr("Escolhe com quem partilhar.");
+    if (metodo === "percentagem" && Math.abs(somaPct - 100) > 0.5) return setErr("As percentagens têm de somar 100% (agora " + Math.round(somaPct) + "%).");
+    if (metodo === "personalizado" && Math.abs(diff) > 0.02) return setErr("Os valores têm de somar " + BM.eur(valor) + " (diferença de " + BM.eur(Math.abs(diff)) + ").");
+    const qz = {}; parts.forEach((p) => (qz[p] = Math.round((quotas[p] || 0) * 100) / 100));
+    onSave({ id: BM.uid(), titulo: f.titulo.trim(), categoria: f.categoria, valor, data: f.data, vencimento: f.vencimento || "", pagador: f.pagador, participantes: parts, metodo, quotas: qz, estado: f.estado, obs: f.obs.trim(), anexos, pagamentos: {} });
   };
   return (
     <Modal title="Nova despesa" sub={grupo.nome} onClose={onClose}
@@ -405,35 +469,90 @@ function DespesaPartilhadaModal({ grupo, onClose, onSave }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Field label="Descrição"><input className="input" autoFocus value={f.titulo} onChange={set("titulo")} placeholder="Ex: Renda, Compras, Internet…" /></Field>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Categoria"><select className="select" value={f.categoria} onChange={set("categoria")}>{Object.keys(BM.cats).map((k) => <option key={k} value={k}>{BM.cats[k].nome}</option>)}</select></Field>
           <Field label="Valor"><input className="input" inputMode="decimal" value={f.valor} onChange={set("valor")} placeholder="0,00" /></Field>
-          <Field label="Data"><input className="input" type="date" value={f.data} onChange={set("data")} /></Field>
         </div>
-        <Field label="Quem pagou">
-          <select className="select" value={f.pagador} onChange={set("pagador")}>{pessoas.map((p) => <option key={p}>{p}</option>)}</select>
-        </Field>
-        <Field label="Dividir entre">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Data"><input className="input" type="date" value={f.data} onChange={set("data")} /></Field>
+          <Field label="Vencimento" hint="opcional"><input className="input" type="date" value={f.vencimento} onChange={set("vencimento")} /></Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Quem pagou"><select className="select" value={f.pagador} onChange={set("pagador")}>{pessoas.map((p) => <option key={p}>{p}</option>)}</select></Field>
+          <Field label="Estado"><select className="select" value={f.estado} onChange={set("estado")}>{ESTADOS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></Field>
+        </div>
+        <Field label="Partilhar com">
           <div className="prem-parts">
             {pessoas.map((p) => <button type="button" key={p} className={"chip" + (parts.includes(p) ? " sel" : "")} style={{ cursor: "pointer" }} onClick={() => toggle(p)}>{p}</button>)}
           </div>
         </Field>
-        {numOf(f.valor) > 0 && parts.length > 0 && <div className="muted tiny" style={{ fontWeight: 600 }}>Cada pessoa fica com {BM.eur(porPessoa)}.</div>}
+        <Field label="Método de divisão">
+          <div className="pg-seg">
+            {[["igual", "Igual"], ["percentagem", "Percentagem"], ["personalizado", "Valor exato"]].map(([id, lbl]) => (
+              <button type="button" key={id} className={"pg-seg-b" + (metodo === id ? " on" : "")} onClick={() => setMetodo(id)}>{lbl}</button>
+            ))}
+          </div>
+        </Field>
+        {parts.length > 0 && metodo === "igual" && valor > 0 && (
+          <div className="muted tiny" style={{ fontWeight: 600 }}>Cada pessoa fica com {BM.eur(valor / parts.length)}.</div>
+        )}
+        {parts.length > 0 && metodo !== "igual" && (
+          <div className="pg-split">
+            {parts.map((p) => (
+              <div className="pg-split-row" key={p}>
+                <span className="prem-avatar sm">{inicial(p)}</span>
+                <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{p}</span>
+                {metodo === "percentagem"
+                  ? <span className="pg-split-in"><input className="input" inputMode="decimal" value={pcts[p] || ""} onChange={(e) => setPcts((s) => ({ ...s, [p]: e.target.value }))} placeholder="0" /><i>%</i></span>
+                  : <span className="pg-split-in"><input className="input" inputMode="decimal" value={vals[p] || ""} onChange={(e) => setVals((s) => ({ ...s, [p]: e.target.value }))} placeholder="0,00" /><i>€</i></span>}
+                <span className="pg-split-q">{BM.eur(quotas[p] || 0)}</span>
+              </div>
+            ))}
+            <div className={"pg-split-sum" + ((metodo === "percentagem" ? Math.abs(somaPct - 100) < 0.5 : Math.abs(diff) < 0.02) ? " ok" : " bad")}>
+              {metodo === "percentagem"
+                ? "Soma: " + Math.round(somaPct) + "%" + (Math.abs(somaPct - 100) < 0.5 ? " ✓" : " · tem de dar 100%")
+                : "Soma: " + BM.eur(somaQuotas) + " / " + BM.eur(valor) + (Math.abs(diff) < 0.02 ? " ✓" : "")}
+            </div>
+          </div>
+        )}
+        <Field label="Observações" hint="opcional"><textarea className="input" rows={2} value={f.obs} onChange={set("obs")} placeholder="Notas sobre a despesa…" style={{ resize: "vertical", fontFamily: "inherit" }} /></Field>
+        <Field label="Anexar fatura" hint="imagem ou PDF">
+          <label className="pg-upload">
+            <input type="file" accept="image/*,application/pdf" multiple style={{ display: "none" }} onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+            <Icon name="plus" size={16} color="var(--accent)" /> {busy ? "A processar…" : "Escolher ficheiro(s)"}
+          </label>
+          {anexos.length > 0 && (
+            <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              {anexos.map((a, i) => (
+                <span key={i} className="chip" style={{ gap: 7 }}><Icon name="receipt" size={12} /> {a.nome.length > 18 ? a.nome.slice(0, 16) + "…" : a.nome}
+                  <button type="button" onClick={() => setAnexos((arr) => arr.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", color: "var(--ink-3)" }}><span style={{ transform: "rotate(45deg)", display: "grid" }}><Icon name="plus" size={12} color="var(--ink-3)" /></span></button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="muted tiny" style={{ fontWeight: 600, marginTop: 6, lineHeight: 1.5 }}>As imagens são reduzidas automaticamente e guardadas localmente. A leitura automática (OCR) chega numa fase futura.</div>
+        </Field>
         {err && <div className="alert bad" style={{ padding: "9px 12px" }}><Icon name="info" size={16} color="var(--neg)" /><span style={{ fontSize: 12.5, fontWeight: 700 }}>{err}</span></div>}
       </div>
     </Modal>
   );
+}
+function quotaDe(e, p, parts) {
+  if (e && e.quotas && e.quotas[p] != null) return +e.quotas[p] || 0;
+  const n = (parts && parts.length) ? parts.length : 1;
+  return (+((e && e.valor)) || 0) / n;
 }
 function balancos(g) {
   const pessoas = ["Eu", ...(g.membros || [])];
   const net = {}; pessoas.forEach((p) => (net[p] = 0));
   (g.despesas || []).forEach((e) => {
     const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
-    const share = (+e.valor || 0) / parts.length;
     const pagos = e.pagamentos || {};
     if (net[e.pagador] == null) net[e.pagador] = 0;
     parts.forEach((p) => {
       if (net[p] == null) net[p] = 0;
       if (p === e.pagador) return;   // o pagador não deve a si próprio
       if (pagos[p]) return;          // já acertou esta despesa — sai do saldo
+      const share = quotaDe(e, p, parts);
       net[p] -= share;               // deve a sua parte
       net[e.pagador] += share;       // o pagador tem essa parte a receber
     });
@@ -454,13 +573,13 @@ function grupoStats(g) {
   let aReceber = 0, emDivida = 0, emAberto = 0, porLiquidar = 0;
   desp.forEach((e) => {
     const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
-    const share = parts.length ? (+e.valor || 0) / parts.length : 0;
     const pagos = e.pagamentos || {};
     let aberta = false;
     parts.forEach((p) => {
       if (p === e.pagador) return;
       if (pagos[p]) return;
       aberta = true;
+      const share = quotaDe(e, p, parts);
       emAberto += share;
       if (e.pagador === "Eu") aReceber += share;
       if (p === "Eu") emDivida += share;
@@ -479,6 +598,7 @@ function PartilhaInner() {
   const [despModal, setDespModal] = React.useState(null);
   const [openId, setOpenId] = React.useState(null);
   const [tab, setTab] = React.useState("dashboard");
+  const [anexoView, setAnexoView] = React.useState(null);
   const [delId, setDelId] = React.useState(null);
   const [convEmail, setConvEmail] = React.useState("");
   const aberto = grupos.find((g) => g.id === openId);
@@ -490,6 +610,12 @@ function PartilhaInner() {
     const desp = [...(aberto.despesas || [])].sort((a, b) => (b.data || "").localeCompare(a.data || ""));
     const pend = (aberto.convites || []).filter((c) => c.estado === "pendente").length;
     const pctPago = stats.total > 0 ? Math.round((stats.totalPago / stats.total) * 100) : 0;
+    const catBreak = (() => {
+      const by = {};
+      (aberto.despesas || []).forEach((e) => { const k = e.categoria || "outros"; by[k] = (by[k] || 0) + (+e.valor || 0); });
+      return Object.keys(by).map((k) => ({ key: k, nome: (BM.cats[k] || BM.cats.outros).nome, color: (BM.cats[k] || BM.cats.outros).color, valor: by[k] })).sort((a, b) => b.valor - a.valor);
+    })();
+    const proximas = (aberto.despesas || []).filter((e) => e.vencimento).sort((a, b) => (a.vencimento || "").localeCompare(b.vencimento || "")).slice(0, 5);
     const convidar = () => { const v = convEmail.trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(v)) return; const nm = nomeDeEmail(v); if (!(aberto.membros || []).includes(nm)) prem.edit("grupos", aberto.id, { membros: [...(aberto.membros || []), nm], convites: [...(aberto.convites || []), { email: v, nome: nm, estado: "pendente" }] }); setConvEmail(""); };
     const kpis = [
       { lbl: "Total de despesas", val: BM.eur(stats.total), sub: "total do grupo", ic: "wallet", c: "#14a06b" },
@@ -555,9 +681,19 @@ function PartilhaInner() {
                     );
                   })}
               </div>
-              <div className="card card-pad pg-soon">
-                <div className="prem-sec-t">Próximas despesas</div>
-                <div className="pg-soon-b"><Icon name="history" size={18} color="var(--ink-3)" /><span>Vencimentos e recorrentes do grupo chegam com o novo formulário de despesa na <b>Fase 2</b>.</span></div>
+              <div className="card card-pad">
+                <div className="pg-sec-h"><div className="prem-sec-t">Próximas despesas</div>{proximas.length > 0 && <button className="pg-link" onClick={() => setTab("calendario")}>Calendário</button>}</div>
+                {proximas.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600 }}>Sem vencimentos marcados. Ao criar uma despesa, define uma data de vencimento.</div> :
+                  proximas.map((e) => {
+                    const mm = (e.vencimento || "").split("-"); const du = daysUntil(e.vencimento);
+                    return (
+                      <div className="pg-up" key={e.id}>
+                        <div className="pg-up-d"><div className="dd">{mm[2]}</div><div className="mm">{BM.MESES[+mm[1] - 1]}</div></div>
+                        <div className="pg-up-main"><div className="pg-up-t">{e.titulo}</div><div className="pg-up-m">{du < 0 ? "vencida" : du === 0 ? "vence hoje" : "em " + du + (du === 1 ? " dia" : " dias")}</div></div>
+                        <div className="pg-up-v">{BM.eur(e.valor)}</div>
+                      </div>
+                    );
+                  })}
               </div>
               <div className="card card-pad">
                 <div className="prem-sec-t">Atividade do grupo</div>
@@ -579,9 +715,21 @@ function PartilhaInner() {
                   <div className="prem-balrow" key={p}><span className="prem-avatar">{inicial(p)}</span><span style={{ flex: 1, fontWeight: 700 }}>{p}</span>{balTag(net[p] || 0)}</div>
                 ))}
               </div>
-              <div className="card card-pad pg-soon">
+              <div className="card card-pad">
                 <div className="prem-sec-t">Despesas por categoria</div>
-                <div className="pg-soon-b"><Icon name="piechart" size={18} color="var(--ink-3)" /><span>O gráfico por categoria aparece quando as despesas passarem a ter categoria, na <b>Fase 2</b>.</span></div>
+                {catBreak.length === 0 ? <div className="muted tiny" style={{ fontWeight: 600, marginTop: 4 }}>Sem despesas ainda.</div> :
+                  <div className="row" style={{ gap: 16, alignItems: "center", marginTop: 6 }}>
+                    <DonutChart data={catBreak} size={140} thickness={22} center={<div><div className="tnum" style={{ fontWeight: 800, fontSize: 14 }}>{BM.eur0(stats.total)}</div><div className="tiny muted" style={{ fontWeight: 600 }}>Total</div></div>} />
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                      {catBreak.slice(0, 5).map((c) => (
+                        <div className="row" key={c.key} style={{ gap: 9, fontSize: 12.5 }}>
+                          <span className="dot" style={{ background: c.color }} />
+                          <span style={{ fontWeight: 600, color: "var(--ink-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</span>
+                          <span style={{ fontWeight: 700 }}>{BM.eur(c.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>}
               </div>
             </div>
           </div>
@@ -595,20 +743,28 @@ function PartilhaInner() {
                 const parts = (e.participantes && e.participantes.length) ? e.participantes : pessoas;
                 const pagos = e.pagamentos || {};
                 const devedores = parts.filter((p) => p !== e.pagador);
+                const ci = BM.cats[e.categoria] || BM.cats.outros;
                 return (
                   <div key={e.id} style={{ borderBottom: "1px solid var(--border)" }}>
                     <div className="prem-row" style={{ borderBottom: "none" }}>
-                      <span className="prem-rico sm"><Icon name="receipt" size={17} color="var(--ink-2)" /></span>
-                      <div className="prem-rtxt"><b>{e.titulo}</b><span className="muted" style={{ fontSize: 12 }}>{e.data ? BM.fmtData(e.data) + " · " : ""}Pagou {e.pagador} · ÷ {parts.length} = {BM.eur((+e.valor || 0) / parts.length)}</span></div>
+                      <span className="prem-rico sm" style={{ background: "color-mix(in srgb, " + ci.color + " 15%, transparent)" }}><Icon name={ci.icon || "receipt"} size={16} color={ci.color} /></span>
+                      <div className="prem-rtxt">
+                        <b>{e.titulo} {estadoPill(e.estado)}</b>
+                        <span className="muted" style={{ fontSize: 12 }}>{ci.nome}{e.data ? " · " + BM.fmtData(e.data) : ""} · Pagou {e.pagador}{e.vencimento ? " · vence " + BM.fmtData(e.vencimento) : ""}</span>
+                      </div>
                       <div className="prem-ramt">{BM.eur(e.valor)}</div>
-                      <div className="prem-rbtns"><button className="icon-btn" title="Apagar despesa" onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).filter((x) => x.id !== e.id) })}><Icon name="trash" size={15} color="var(--neg)" /></button></div>
+                      <div className="prem-rbtns">
+                        {(e.anexos && e.anexos.length > 0) && <button className="icon-btn" title="Ver anexo" onClick={() => setAnexoView(e.anexos[0])}><Icon name="receipt" size={15} color="var(--ink-2)" /></button>}
+                        <button className="icon-btn" title="Apagar despesa" onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).filter((x) => x.id !== e.id) })}><Icon name="trash" size={15} color="var(--neg)" /></button>
+                      </div>
                     </div>
+                    {e.obs && <div className="muted" style={{ fontSize: 12, padding: "0 14px 6px 52px", lineHeight: 1.5 }}>{e.obs}</div>}
                     {devedores.length > 0 && (
                       <div className="row" style={{ gap: 6, flexWrap: "wrap", padding: "0 14px 12px 52px" }}>
                         {devedores.map((p) => {
                           const pago = !!pagos[p];
                           return <button type="button" key={p} className={"chip" + (pago ? " sel" : "")} style={{ cursor: "pointer" }} title={pago ? "Marcar como em dívida" : "Marcar como pago"}
-                            onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)) })}>{p}: {pago ? "pagou ✓" : "deve"}</button>;
+                            onClick={() => prem.edit("grupos", aberto.id, { despesas: (aberto.despesas || []).map((x) => (x.id === e.id ? { ...x, pagamentos: { ...(x.pagamentos || {}), [p]: !pago } } : x)) })}>{p}: {pago ? "pagou ✓" : BM.eur(quotaDe(e, p, parts)) + " deve"}</button>;
                         })}
                       </div>
                     )}
@@ -675,6 +831,7 @@ function PartilhaInner() {
         )}
 
         {despModal && <DespesaPartilhadaModal grupo={aberto} onClose={() => setDespModal(null)} onSave={(d) => { prem.edit("grupos", aberto.id, { despesas: [...(aberto.despesas || []), d] }); setDespModal(null); }} />}
+        {anexoView && <AnexoViewer anexo={anexoView} onClose={() => setAnexoView(null)} />}
       </div>
     );
   }
