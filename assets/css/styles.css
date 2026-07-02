@@ -3800,14 +3800,14 @@ input.range::-moz-range-thumb {
 
 /* ---- Tokens: neutros mais limpos + sombras suaves em camadas ---- */
 [data-theme="light"] {
-  --bg: #eef2f0;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f5f8f6;
+  --surface-2: #f5f7f9;
   --ink: #0f1a16;
   --ink-2: #46544d;
   --ink-3: #7c897f;
-  --border: #e8edea;
-  --border-strong: #dde4e0;
+  --border: #d4dbe2;
+  --border-strong: #b7c1cb;
   --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff);
   --shadow-sm: 0 1px 2px rgba(16, 40, 28, .05);
   --shadow: 0 1px 2px rgba(16, 40, 28, .04), 0 10px 26px -16px rgba(16, 40, 28, .20);
