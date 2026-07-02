@@ -1705,20 +1705,103 @@ function resolverAlerta(prem, a) {
   }
 }
 
+/* Dias decorridos desde uma data ISO (positivo se no passado). */
+function diasDesde(iso) {
+  if (!iso) return 0;
+  const h = new Date(); const hj = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  const p = String(iso).slice(0, 10).split("-").map(Number);
+  const d = new Date(p[0], (p[1] || 1) - 1, p[2] || 1);
+  return Math.round((hj - d) / 86400000);
+}
+
+/* MOTOR DE NOTIFICAÇÕES — função pura: recebe o estado, devolve a lista.
+   Hoje corre no browser; amanhã, com backend, corre igual num cron job.
+   Categorias: pagamento · trial · orcamento · meta · insight · inatividade */
+function gerarNotificacoes(prem, dados) {
+  const s = prem.get();
+  const d0 = dados || {};
+  const out = [];
+  const mes = BM.todayISO().slice(0, 7);
+
+  // 1) Pagamentos a vencer (lembretes, subscrições, recorrentes) — reutiliza scanAlertas
+  scanAlertas(prem).forEach((a) => {
+    out.push({
+      chave: a.chave, cat: "pagamento", sev: a.d <= 0 ? "urgent" : "warn",
+      icon: a.tipo === "subscricao" ? "tv" : a.tipo === "recorrente" ? "sync" : "bell",
+      titulo: a.titulo, texto: quandoTxt(a.d), valor: a.valor, d: a.d,
+      tipo: a.tipo, id: a.id, acao: "pagar",
+    });
+  });
+
+  // 2) Períodos gratuitos (trials) a terminar
+  (s.subscricoes || []).filter((x) => (x.estado || "ativa") === "trial").forEach((x) => {
+    const dias = daysUntil(mes + "-" + String(Math.min(28, x.dia || 1)).padStart(2, "0"));
+    if (dias <= 5) out.push({
+      chave: "trial:" + x.id + ":" + mes, cat: "trial", sev: dias <= 2 ? "urgent" : "warn", icon: "spark",
+      titulo: x.nome + " — período gratuito a terminar",
+      texto: (dias <= 0 ? "Termina hoje" : "Termina em " + dias + " dia" + (dias > 1 ? "s" : "")) + " · depois passa a " + BM.eur(x.valor) + "/mês",
+    });
+  });
+
+  // 3) Orçamento mensal (80% / ultrapassado)
+  const orc = +d0.orcamento || 0;
+  if (orc > 0) {
+    const gasto = (d0.despesas || []).filter((e) => BM.monthKey(e.data) === mes).reduce((a, e) => a + (+e.valor || 0), 0);
+    const pct = Math.round((gasto / orc) * 100);
+    if (gasto >= orc) out.push({ chave: "orc:over:" + mes, cat: "orcamento", sev: "urgent", icon: "wallet", titulo: "Orçamento do mês ultrapassado", texto: "Já gastaste " + BM.eur(gasto) + " de " + BM.eur(orc) + " (" + pct + "%)." });
+    else if (gasto >= orc * 0.8) out.push({ chave: "orc:80:" + mes, cat: "orcamento", sev: "warn", icon: "wallet", titulo: "Perto do limite do orçamento", texto: "Já usaste " + pct + "% (" + BM.eur(gasto) + " de " + BM.eur(orc) + ")." });
+  }
+
+  // 4) Metas de poupança (50% / concluída)
+  (d0.metas || []).forEach((m) => {
+    if (m.fechada) return;
+    const alvo = +m.alvo || 0, atual = +m.atual || 0;
+    if (alvo <= 0) return;
+    const pct = atual / alvo;
+    if (atual >= alvo) out.push({ chave: "meta:done:" + m.id, cat: "meta", sev: "info", icon: "target", titulo: "Meta atingida: " + m.nome + " 🎉", texto: "Chegaste a " + BM.eur(atual) + " de " + BM.eur(alvo) + ". Já podes fechar esta meta." });
+    else if (pct >= 0.5) out.push({ chave: "meta:half:" + m.id + ":" + mes, cat: "meta", sev: "info", icon: "target", titulo: "Já vais a meio: " + m.nome, texto: Math.round(pct * 100) + "% da meta (" + BM.eur(atual) + " de " + BM.eur(alvo) + ")." });
+  });
+
+  // 5) Insights — subscrições semelhantes/duplicadas
+  const porCat = {};
+  (s.subscricoes || []).filter((x) => (x.estado || "ativa") === "ativa").forEach((x) => { const c = subCat(x); (porCat[c] = porCat[c] || []).push(x); });
+  Object.keys(porCat).forEach((c) => {
+    if (porCat[c].length > 1) {
+      const menor = Math.min.apply(null, porCat[c].map((x) => mensalDe(x)));
+      out.push({ chave: "dup:" + c, cat: "insight", sev: "info", icon: "spark", titulo: "Tens " + porCat[c].length + " serviços de " + subCatMeta(c).nome, texto: porCat[c].map((x) => x.nome).join(", ") + " · podes poupar ~" + BM.eur(menor) + "/mês." });
+    }
+  });
+
+  // 6) Inatividade — sem registar despesas/rendimentos há 3 dias / 1 semana / 1 mês
+  const datas = [].concat(d0.despesas || [], d0.rendimentos || []).map((m) => m.data).filter(Boolean).sort();
+  if (datas.length) {
+    const dias = diasDesde(datas[datas.length - 1]);
+    let lim = 0; if (dias >= 30) lim = 30; else if (dias >= 7) lim = 7; else if (dias >= 3) lim = 3;
+    if (lim) {
+      const txt = lim === 30 ? "um mês" : lim === 7 ? "uma semana" : "3 dias";
+      out.push({ chave: "inativo:" + lim, cat: "inatividade", sev: lim >= 30 ? "warn" : "info", icon: "history",
+        titulo: "Há mais de " + txt + " sem registos", texto: "O último movimento foi há " + dias + " dias. Regista as tuas despesas recentes para manteres as contas em dia." });
+    }
+  }
+
+  const ordSev = { urgent: 0, warn: 1, info: 2 };
+  return out.sort((a, b) => (ordSev[a.sev] - ordSev[b.sev]) || ((a.d == null ? 99 : a.d) - (b.d == null ? 99 : b.d)));
+}
+
 /* Dispara notificações nativas do dispositivo (só enquanto a app está aberta).
    Junta tudo numa só notificação-resumo e não repete o mesmo aviso no mesmo dia. */
-function dispararNotificacoesNativas(prem) {
+function dispararNotificacoesNativas(prem, dados) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   const s = prem.get();
   if (!(s.notif && s.notif.ativo)) return;
   const hoje = BM.todayISO();
   const log = s.notifLog || {};
   const jaHoje = new Set(log[hoje] || []);
-  const novos = scanAlertas(prem).filter((a) => !jaHoje.has(a.chave));
+  const novos = gerarNotificacoes(prem, dados || {}).filter((a) => !jaHoje.has(a.chave));
   if (!novos.length) return;
-  const titulo = novos.length === 1 ? "Tens um pagamento a tratar" : `Tens ${novos.length} pagamentos a tratar`;
-  const corpo = novos.slice(0, 3).map((a) => `${a.titulo} · ${BM.eur(a.valor)}`).join("\n") + (novos.length > 3 ? `\n+ ${novos.length - 3} mais` : "");
-  try { new Notification("Rende+ · " + titulo, { body: corpo, icon: "/icon-192.png", badge: "/icon-192.png", tag: "rende-pagamentos", renotify: true }); } catch (e) {}
+  const titulo = novos.length === 1 ? "Tens uma novidade" : "Tens " + novos.length + " novidades";
+  const corpo = novos.slice(0, 3).map((a) => a.titulo).join("\n") + (novos.length > 3 ? "\n+ " + (novos.length - 3) + " mais" : "");
+  try { new Notification("Rende+ · " + titulo, { body: corpo, icon: "/icon-192.png", badge: "/icon-192.png", tag: "rende-notifs", renotify: true }); } catch (e) {}
   prem.update({ notifLog: { [hoje]: [...jaHoje, ...novos.map((a) => a.chave)] } }); // guarda só o dia de hoje (auto-limpa o passado)
 }
 
@@ -1726,25 +1809,28 @@ const quandoTxt = (d) => d < 0 ? `há ${Math.abs(d)} dia${d === -1 ? "" : "s"}` 
 
 function NotifBell() {
   const prem = usePremium();
+  const fin = useFinance();
+  const dados = fin.data || {};
   const [open, setOpen] = React.useState(false);
   const [perm, setPerm] = React.useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
   const s = prem.get();
   const cfg = s.notif || { ativo: true, aviso: 3 };
-  const alertas = scanAlertas(prem);
-  const count = alertas.length;
+  const notifs = gerarNotificacoes(prem, dados);
+  const count = notifs.length;
 
   // dispara ao abrir a app e a cada 30 min enquanto está aberta
+  const nMov = (dados.despesas || []).length + (dados.rendimentos || []).length;
   React.useEffect(() => {
     if (!cfg.ativo) return;
-    const tick = () => dispararNotificacoesNativas(prem);
+    const tick = () => dispararNotificacoesNativas(prem, fin.data || {});
     tick();
     const iv = setInterval(tick, 1000 * 60 * 30);
     return () => clearInterval(iv);
-  }, [cfg.ativo]);
+  }, [cfg.ativo, nMov]);
 
   const pedirPermissao = () => {
     if (typeof Notification === "undefined") return;
-    Notification.requestPermission().then((p) => { setPerm(p); if (p === "granted") dispararNotificacoesNativas(prem); });
+    Notification.requestPermission().then((p) => { setPerm(p); if (p === "granted") dispararNotificacoesNativas(prem, fin.data || {}); });
   };
   const setCfg = (patch) => prem.update({ notif: { ...cfg, ...patch } });
 
@@ -1776,19 +1862,19 @@ function NotifBell() {
             )}
 
             <div className="notif-list">
-              {alertas.length === 0 ? (
-                <div className="notif-empty"><Icon name="check" size={20} color="var(--accent)" /><span>Estás em dia. Nada a pagar por agora.</span></div>
+              {notifs.length === 0 ? (
+                <div className="notif-empty"><Icon name="check" size={20} color="var(--accent)" /><span>Estás em dia. Nada a tratar por agora.</span></div>
               ) : (
-                alertas.map((a) => {
-                  const cor = a.d < 0 ? "var(--neg)" : a.d === 0 ? "var(--neg)" : "var(--accent)";
+                notifs.map((a) => {
+                  const cor = a.sev === "urgent" ? "var(--neg)" : a.sev === "warn" ? "#e0792b" : "var(--accent)";
                   return (
                     <div className="notif-item" key={a.chave}>
-                      <span className="notif-item-ico" style={{ background: `color-mix(in srgb, ${cor} 14%, transparent)` }}><Icon name={a.tipo === "subscricao" ? "tv" : a.tipo === "recorrente" ? "sync" : "bell"} size={16} color={cor} /></span>
+                      <span className="notif-item-ico" style={{ background: "color-mix(in srgb, " + cor + " 14%, transparent)" }}><Icon name={a.icon || "bell"} size={16} color={cor} /></span>
                       <div className="notif-item-txt">
                         <b>{a.titulo}</b>
-                        <span style={{ color: cor, fontWeight: 700 }}>{quandoTxt(a.d)} · {BM.eur(a.valor)}</span>
+                        <span className="notif-item-sub">{a.texto}{(a.valor != null && a.cat === "pagamento") ? " · " + BM.eur(a.valor) : ""}</span>
                       </div>
-                      <button className="btn btn-soft" style={{ padding: "6px 11px", fontSize: 12 }} onClick={() => resolverAlerta(prem, a)}>Pagar</button>
+                      {a.acao === "pagar" && <button className="btn btn-soft" style={{ padding: "6px 11px", fontSize: 12, flex: "none" }} onClick={() => resolverAlerta(prem, a)}>Pagar</button>}
                     </div>
                   );
                 })

@@ -6653,3 +6653,30 @@ body.drawer-lock {
 .sub-cal-block {
   margin-top: 10px;
 }
+
+/* Notificações — itens multilinha (motor de notificações v2) */
+.notif-item {
+  align-items: flex-start;
+}
+
+.notif-item-txt {
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-item-txt b {
+  font-size: 13px;
+  font-weight: 700;
+  display: block;
+  line-height: 1.32;
+}
+
+.notif-item-sub {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+  line-height: 1.42;
+  margin-top: 2px;
+  white-space: normal;
+}
