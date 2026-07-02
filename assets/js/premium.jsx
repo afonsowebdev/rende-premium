@@ -1557,8 +1557,6 @@ function SubscricoesInner() {
         <div className="ph-main">
           <div className="ph-toolbar sub-tools">
             <div className="ph-search"><Icon name="search" size={15} color="var(--ink-3)" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar subscrição…" /></div>
-            <select className="select sub-fil" value={filtro} onChange={(e) => setFiltro(e.target.value)}><option value="todas">Todas</option><option value="ativa">Ativas</option><option value="trial">Trials</option><option value="pausada">Pausadas</option><option value="cancelada">Canceladas</option></select>
-            <select className="select sub-fil" value={ordem} onChange={(e) => setOrdem(e.target.value)}><option value="nome">Nome (A–Z)</option><option value="valor">Valor (maior)</option><option value="renov">Renovação</option></select>
           </div>
 
           <div className="card sub-tablewrap">
@@ -1666,7 +1664,7 @@ function SubscricoesInner() {
         </div>
       </div>
 
-      <div style={{ marginTop: 18 }}>
+      <div style={{ marginTop: 10 }}>
         <div className="prem-sec-t" style={{ marginBottom: 4 }}>Calendário de renovações</div>
         <div className="sub-sec-sub">Todas as datas de renovação do mês, num relance.</div>
         <SubCalendario subs={todas} />

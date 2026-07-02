@@ -20,7 +20,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "accent": "#14a06b",
   "dark": false,
   "font": "Inter",
-  "radius": 16,
+  "radius": 8,
   "density": "regular"
 }/*EDITMODE-END*/;
 

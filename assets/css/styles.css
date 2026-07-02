@@ -1417,7 +1417,7 @@ body.drawer-lock { overflow: hidden; }
   padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); }
 .pg-tab.on .pg-soon-tag { background: var(--surface); }
 
-.pg-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.pg-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .pg-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px 17px; display: flex; flex-direction: column; gap: 11px; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
 .pg-kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
 .pg-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1432,8 +1432,8 @@ body.drawer-lock { overflow: hidden; }
 .pg-kpi-val.neg { color: var(--neg); }
 .pg-kpi-sub { font-size: 11px; font-weight: 600; color: var(--ink-3); }
 
-.pg-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: start; }
-.pg-col { display: flex; flex-direction: column; gap: 16px; }
+.pg-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; align-items: start; }
+.pg-col { display: flex; flex-direction: column; gap: 10px; }
 .pg-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .pg-link { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; }
 
@@ -1526,8 +1526,8 @@ body.drawer-lock { overflow: hidden; }
 /* ============================================================
    RENDE+ · Partilha — Dashboard de entrada (lista de grupos)
    ============================================================ */
-.ph-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
-.ph-layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+.ph-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.ph-layout { display: grid; grid-template-columns: 1fr 320px; gap: 12px; align-items: start; }
 .ph-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .ph-aside { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 4px; }
 
@@ -1659,12 +1659,12 @@ body.drawer-lock { overflow: hidden; }
 /* ============================================================
    RENDE+ · Subscrições — gestor inteligente
    ============================================================ */
-.sub-kpis { margin-bottom: 16px; }
+.sub-kpis { margin-bottom: 10px; }
 .sub-fil { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--ink); box-shadow: none; }
 .sub-fil:focus { outline: none; border-color: var(--accent); box-shadow: none; }
 
 /* tabela */
-.sub-tablewrap { margin-top: 12px; overflow-x: auto; padding: 0; }
+.sub-tablewrap { margin-top: 10px; overflow-x: auto; padding: 0; }
 .sub-table { width: 100%; border-collapse: collapse; min-width: 720px; }
 .sub-table thead th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); padding: 13px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .sub-table tbody td { padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 13.5px; color: var(--ink); vertical-align: middle; white-space: nowrap; }
@@ -1684,11 +1684,11 @@ body.drawer-lock { overflow: hidden; }
 .sub-estado.canc { color: var(--ink-3); background: var(--surface-2); }
 
 /* paginação */
-.sub-pag { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.sub-pag { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
 .sub-pag .btn[disabled] { opacity: .45; pointer-events: none; }
 
 /* descobrir oportunidades */
-.sub-discover { margin-top: 14px; display: flex; align-items: center; gap: 16px; background: linear-gradient(120deg, var(--accent-soft), transparent 70%); }
+.sub-discover { margin-top: 10px; display: flex; align-items: center; gap: 16px; background: linear-gradient(120deg, var(--accent-soft), transparent 70%); }
 .sub-disc-ic { width: 46px; height: 46px; flex: none; border-radius: 13px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 14%, transparent); }
 @media (max-width: 560px) { .sub-discover { flex-direction: column; align-items: flex-start; } .sub-discover .btn { width: 100%; justify-content: center; } }
 
