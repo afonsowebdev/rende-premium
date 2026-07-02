@@ -21,6 +21,7 @@ const PremiumStore = (function () {
     edit(kind, id, patch) { this.update({ [kind]: (get()[kind] || []).map((x) => x.id === id ? { ...x, ...patch } : x) }); },
     activate(plano) { this.update({ premium: true, plano: plano || "month" }); },
     deactivate() { this.update({ premium: false }); },
+    reset() { this.update({ lembretes: [], recorrentes: [], grupos: [], subscricoes: [], pagosSub: {}, pagosRec: {}, notifLog: {} }); },
     subscribe(f) { subs.add(f); return () => subs.delete(f); },
   };
 })();

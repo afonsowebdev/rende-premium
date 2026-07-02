@@ -112,6 +112,7 @@ function FinanceProvider({ children }) {
         apaga("categorias", (data.customCats || []).map((c) => ({ id: c.key }))),
       ]);
       setData({ ...EMPTY_DATA });
+      try { if (window.PremiumStore && window.PremiumStore.reset) window.PremiumStore.reset(); } catch (e) {}
     } catch (e) { erroAlerta(e); }
   };
 

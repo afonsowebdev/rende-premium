@@ -348,7 +348,7 @@ function Perfil({ open }) {
               </div>
               <div style={{ fontWeight: 700, fontSize: 19, letterSpacing: "-.01em" }}>Limpar todos os dados?</div>
               <div className="muted" style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.6, marginTop: 9 }}>
-                Vais remover todas as despesas, rendimentos e metas. A tua conta mantém-se, mas <strong style={{ color: "var(--ink)" }}>esta ação não pode ser revertida</strong>.
+                Vais remover todas as despesas, rendimentos, metas, subscrições, grupos de partilha, lembretes e recorrentes. A tua conta mantém-se, mas <strong style={{ color: "var(--ink)" }}>esta ação não pode ser revertida</strong>.
               </div>
               <div className="row" style={{ gap: 10, marginTop: 24 }}>
                 <button className="btn btn-soft" style={{ flex: 1, justifyContent: "center" }} onClick={() => setConfirmClear(false)}>Cancelar</button>
@@ -361,7 +361,7 @@ function Perfil({ open }) {
           </div>
         </div>
       )}
-      {pinClear && <RLConfirmPin title="Limpar todos os dados" desc="Esta ação remove todas as despesas, rendimentos e metas e não pode ser revertida." onConfirm={() => fin.resetData()} onClose={() => setPinClear(false)} />}
+      {pinClear && <RLConfirmPin title="Limpar todos os dados" desc="Remove despesas, rendimentos, metas, subscrições, grupos de partilha, lembretes e recorrentes. Não pode ser revertida." onConfirm={() => fin.resetData()} onClose={() => setPinClear(false)} />}
     </div>
   );
 }
