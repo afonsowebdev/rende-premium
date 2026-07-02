@@ -6681,8 +6681,9 @@ body.drawer-lock {
   white-space: normal;
 }
 
+
 /* ============================================================
-   RENDE+ · Tela de bloqueio por inatividade
+   RENDE+ · Tela de bloqueio por inatividade (segue o tema)
    ============================================================ */
 .lock-root {
   position: fixed;
@@ -6691,7 +6692,7 @@ body.drawer-lock {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: radial-gradient(130% 120% at 20% 0%, #0c2c1f 0%, #061410 55%, #030b08 100%);
+  background: radial-gradient(130% 120% at 20% 0%, color-mix(in srgb, var(--accent) 10%, var(--surface-2)) 0%, var(--surface-2) 60%, var(--surface-2) 100%);
   animation: lockIn .32s cubic-bezier(.4, 0, .2, 1);
 }
 
@@ -6726,11 +6727,11 @@ body.drawer-lock {
   min-height: min(88vh, 640px);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #0a1512;
-  border: 1px solid rgba(255, 255, 255, .07);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 22px;
   overflow: hidden;
-  box-shadow: 0 40px 120px -30px rgba(0, 0, 0, .7);
+  box-shadow: 0 40px 120px -30px rgba(8, 22, 16, .45);
   animation: lockCard .42s cubic-bezier(.4, 0, .2, 1);
 }
 
@@ -6746,6 +6747,7 @@ body.drawer-lock {
   }
 }
 
+/* coluna esquerda institucional — verde de marca (branca por cima), igual nos 2 temas */
 .lock-left {
   position: relative;
   padding: 40px;
@@ -6755,7 +6757,6 @@ body.drawer-lock {
   gap: 26px;
   color: #fff;
   background: linear-gradient(160deg, #0d3b28 0%, #08271b 60%, #061a12 100%);
-  border-right: 1px solid rgba(255, 255, 255, .06);
 }
 
 .lock-left::after {
@@ -6794,15 +6795,17 @@ body.drawer-lock {
   max-width: 350px;
 }
 
+/* cartão de privacidade: por defeito segue o tema (usado no mobile, dentro da coluna direita) */
 .lock-privacy {
   display: flex;
   gap: 12px;
   align-items: flex-start;
   padding: 14px 16px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .07);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   max-width: 360px;
+  text-align: left;
 }
 
 .lock-privacy-ic {
@@ -6812,23 +6815,43 @@ body.drawer-lock {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: rgba(20, 160, 107, .14);
+  background: var(--accent-soft);
 }
 
 .lock-privacy b {
   display: block;
   font-size: 13px;
   font-weight: 700;
+  color: var(--ink);
 }
 
 .lock-privacy span {
   display: block;
   font-size: 12px;
-  color: rgba(255, 255, 255, .55);
+  color: var(--ink-3);
   margin-top: 2px;
   line-height: 1.4;
 }
 
+/* na coluna esquerda (verde) o cartão é translúcido branco */
+.lock-left .lock-privacy {
+  background: rgba(255, 255, 255, .05);
+  border-color: rgba(255, 255, 255, .08);
+}
+
+.lock-left .lock-privacy-ic {
+  background: rgba(20, 160, 107, .16);
+}
+
+.lock-left .lock-privacy b {
+  color: #fff;
+}
+
+.lock-left .lock-privacy span {
+  color: rgba(255, 255, 255, .55);
+}
+
+/* coluna direita — segue o tema */
 .lock-right {
   padding: 44px 40px;
   display: flex;
@@ -6836,7 +6859,7 @@ body.drawer-lock {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #fff;
+  color: var(--ink);
 }
 
 .lock-ico {
@@ -6846,9 +6869,9 @@ body.drawer-lock {
   display: grid;
   place-items: center;
   margin-bottom: 18px;
-  background: rgba(20, 160, 107, .1);
-  border: 1px solid rgba(20, 160, 107, .3);
-  box-shadow: 0 0 0 8px rgba(20, 160, 107, .05);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 6%, transparent);
   animation: lockPulse 2.8s ease-in-out infinite;
 }
 
@@ -6870,11 +6893,12 @@ body.drawer-lock {
   letter-spacing: -.02em;
   line-height: 1.15;
   margin: 0;
+  color: var(--ink);
 }
 
 .lock-sub {
   font-size: 13.5px;
-  color: rgba(255, 255, 255, .6);
+  color: var(--ink-3);
   margin: 8px 0 22px;
   max-width: 320px;
 }
@@ -6886,8 +6910,8 @@ body.drawer-lock {
   width: 100%;
   max-width: 340px;
   margin-bottom: 20px;
-  background: rgba(255, 255, 255, .05);
-  border: 1px solid rgba(255, 255, 255, .08);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 4px;
 }
@@ -6897,7 +6921,7 @@ body.drawer-lock {
   z-index: 1;
   border: none;
   background: none;
-  color: rgba(255, 255, 255, .55);
+  color: var(--ink-3);
   font: inherit;
   font-size: 13.5px;
   font-weight: 700;
@@ -6908,7 +6932,7 @@ body.drawer-lock {
 }
 
 .lock-tab.on {
-  color: #fff;
+  color: var(--ink);
 }
 
 .lock-tab-ink {
@@ -6919,8 +6943,8 @@ body.drawer-lock {
   width: calc(50% - 4px);
   height: calc(100% - 8px);
   border-radius: 9px;
-  background: rgba(20, 160, 107, .22);
-  border: 1px solid rgba(20, 160, 107, .45);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   transition: transform .26s cubic-bezier(.4, 0, .2, 1);
 }
 
@@ -6944,7 +6968,7 @@ body.drawer-lock {
 
 .lock-pin-label {
   font-size: 12.5px;
-  color: rgba(255, 255, 255, .5);
+  color: var(--ink-3);
   font-weight: 600;
   margin-bottom: 12px;
 }
@@ -6961,10 +6985,10 @@ body.drawer-lock {
   text-align: center;
   font-size: 26px;
   font-weight: 800;
-  color: #fff;
+  color: var(--ink);
   caret-color: var(--accent);
-  background: rgba(255, 255, 255, .04);
-  border: 1.5px solid rgba(255, 255, 255, .14);
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
   border-radius: 14px;
   outline: none;
   font-family: inherit;
@@ -6973,13 +6997,13 @@ body.drawer-lock {
 
 .lock-pin-box:focus {
   border-color: var(--accent);
-  background: rgba(20, 160, 107, .08);
-  box-shadow: 0 0 0 4px rgba(20, 160, 107, .16);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .lock-pin-box.err {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, .15);
+  border-color: var(--neg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--neg) 15%, transparent);
 }
 
 .lock-pass {
@@ -6988,28 +7012,12 @@ body.drawer-lock {
 
 .lock-pass-input {
   width: 100%;
-  background: rgba(255, 255, 255, .05);
-  border: 1.5px solid rgba(255, 255, 255, .14);
-  color: #fff;
-  padding: 13px 46px 13px 14px;
-  border-radius: 12px;
-  font-size: 14.5px;
-  font-family: inherit;
-}
-
-.lock-pass-input::placeholder {
-  color: rgba(255, 255, 255, .35);
-}
-
-.lock-pass-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(20, 160, 107, .16);
-  outline: none;
+  padding-right: 46px;
 }
 
 .lock-pass-input.err {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, .15);
+  border-color: var(--neg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--neg) 15%, transparent);
 }
 
 .lock-eye {
@@ -7028,14 +7036,14 @@ body.drawer-lock {
 }
 
 .lock-eye:hover {
-  background: rgba(255, 255, 255, .08);
+  background: var(--surface-2);
 }
 
 .lock-msg {
   height: 18px;
   font-size: 12.5px;
   font-weight: 700;
-  color: #ff9b9b;
+  color: var(--neg);
   margin: 12px 0 4px;
   opacity: 0;
   transition: opacity .2s;
@@ -7060,7 +7068,7 @@ body.drawer-lock {
   font-weight: 800;
   letter-spacing: -.01em;
   transition: filter .16s, transform .04s;
-  box-shadow: 0 12px 32px -12px rgba(20, 160, 107, .7);
+  box-shadow: 0 12px 32px -14px color-mix(in srgb, var(--accent) 75%, transparent);
 }
 
 .lock-btn:hover {
@@ -7083,7 +7091,7 @@ body.drawer-lock {
   align-items: center;
   gap: 12px;
   margin: 16px 0;
-  color: rgba(255, 255, 255, .35);
+  color: var(--ink-3);
   font-size: 12px;
   font-weight: 600;
 }
@@ -7093,7 +7101,7 @@ body.drawer-lock {
   content: "";
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, .1);
+  background: var(--border);
 }
 
 .lock-alt {
@@ -7105,10 +7113,10 @@ body.drawer-lock {
   gap: 8px;
   padding: 12px;
   cursor: pointer;
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .12);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 13.5px;
   font-weight: 700;
@@ -7116,7 +7124,7 @@ body.drawer-lock {
 }
 
 .lock-alt:hover {
-  background: rgba(255, 255, 255, .08);
+  background: color-mix(in srgb, var(--ink) 6%, var(--surface-2));
 }
 
 .lock-foot {
@@ -7130,13 +7138,14 @@ body.drawer-lock {
   gap: 6px;
   font-size: 12.5px;
   font-weight: 700;
-  color: rgba(255, 255, 255, .6);
+  color: var(--ink-3);
 }
 
 .lock-foot span {
   display: block;
   font-size: 12px;
-  color: rgba(255, 255, 255, .4);
+  color: var(--ink-3);
+  opacity: .8;
   margin-top: 3px;
 }
 
@@ -7213,7 +7222,6 @@ body.drawer-lock {
 
   .lock-privacy.lock-m {
     display: flex;
-    text-align: left;
   }
 }
 
