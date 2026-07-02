@@ -4,7 +4,7 @@
    NOTA: em produção, trocar por um hash forte (SHA-256 / bcrypt no backend). */
 (function () {
   const KEY = "rende_lock";
-  const DEFAULT_MIN = 30; // minutos de inatividade até bloquear (predefinição)
+  const DEFAULT_MIN = 5; // minutos de inatividade até bloquear (predefinição)
 
   const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } };
   const write = (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} };
@@ -31,43 +31,140 @@
   window.RendeLock = RendeLock;
 })();
 
-/* ---------- Ecrã de bloqueio (teclado de dígitos) ---------- */
+/* ---------- Ecrã de bloqueio (mockup: 2 colunas · PIN + Palavra-passe) ---------- */
 function LockScreen({ onUnlock }) {
-  const [val, setVal] = React.useState("");
-  const [err, setErr] = React.useState("");
-  const tryUnlock = (v) => {
-    if (window.RendeLock.verify(v)) { window.RendeLock.markUnlocked(); onUnlock(); }
-    else { setErr("PIN incorreto"); setVal(""); }
+  const fin = useFinance();
+  const acc = (fin && fin.account) || {};
+  const email = acc.email || "";
+  const podePass = !!email;
+  const [tab, setTab] = React.useState("pin");
+  const [digits, setDigits] = React.useState(["", "", "", ""]);
+  const [pass, setPass] = React.useState("");
+  const [showPass, setShowPass] = React.useState(false);
+  const [status, setStatus] = React.useState("idle"); // idle | validating | error | ok
+  const [msg, setMsg] = React.useState("");
+  const refs = [React.useRef(null), React.useRef(null), React.useRef(null), React.useRef(null)];
+
+  React.useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const t = setTimeout(() => { if (refs[0].current) refs[0].current.focus(); }, 120);
+    return () => { document.body.style.overflow = prev; clearTimeout(t); };
+  }, []);
+
+  const okUnlock = () => { setStatus("ok"); window.RendeLock.markUnlocked(); setTimeout(onUnlock, 280); };
+  const falhar = (m) => { setStatus("error"); setMsg(m); setTimeout(() => setStatus((s) => (s === "error" ? "idle" : s)), 520); };
+
+  const validarPin = (str) => {
+    if (str.length < 4) return falhar("Completa os 4 dígitos.");
+    setStatus("validating");
+    setTimeout(() => {
+      if (window.RendeLock.verify(str)) okUnlock();
+      else { setDigits(["", "", "", ""]); if (refs[0].current) refs[0].current.focus(); falhar("PIN incorreto. Tenta novamente."); }
+    }, 240);
   };
-  const press = (k) => {
-    setErr("");
-    if (k === "del") return setVal((v) => v.slice(0, -1));
-    if (val.length >= 6) return;
-    const nv = val + k; setVal(nv);
-    if (nv.length === 6) tryUnlock(nv);
+  const onDigit = (i, v) => {
+    const d = v.replace(/\D/g, "").slice(-1);
+    setMsg("");
+    setDigits((arr) => {
+      const n = arr.slice(); n[i] = d;
+      if (d && i < 3 && refs[i + 1].current) refs[i + 1].current.focus();
+      const full = n.join("");
+      if (full.length === 4 && n.every((x) => x)) validarPin(full);
+      return n;
+    });
+    if (status === "error") setStatus("idle");
   };
-  const wrap = { position: "fixed", inset: 0, zIndex: 9000, display: "grid", placeItems: "center", padding: 20, color: "#fff", background: "linear-gradient(150deg, #0b6446, var(--accent) 55%, #083d2c)" };
-  const key = { height: 60, borderRadius: 16, background: "rgba(255,255,255,.13)", border: "none", color: "#fff", fontSize: 23, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
-  const keyAct = { ...key, background: "transparent", fontSize: 14, fontWeight: 700 };
+  const onKey = (i, e) => { if (e.key === "Backspace" && !digits[i] && i > 0 && refs[i - 1].current) refs[i - 1].current.focus(); };
+
+  const validarPass = () => {
+    if (!pass) return falhar("Introduz a palavra-passe.");
+    setStatus("validating");
+    API.login({ email: email, password: pass }).then(() => okUnlock()).catch(() => { setPass(""); falhar("Palavra-passe incorreta."); });
+  };
+
+  const erro = status === "error";
+  const ocupado = status === "validating" || status === "ok";
+  const acionar = () => (tab === "pin" ? validarPin(digits.join("")) : validarPass());
+
   return (
-    <div style={wrap}>
-      <div style={{ width: "100%", maxWidth: 340, textAlign: "center" }}>
-        <div style={{ width: 70, height: 70, borderRadius: 20, background: "rgba(255,255,255,.16)", display: "grid", placeItems: "center", margin: "0 auto 18px" }}>
-          <Icon name="lock" size={32} color="#fff" />
-        </div>
-        <div style={{ fontWeight: 800, fontSize: 22, letterSpacing: "-.01em" }}>Sessão bloqueada</div>
-        <div style={{ opacity: .85, fontSize: 14, margin: "6px 0 22px" }}>Introduz o teu PIN para continuar</div>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 18 }}>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <span key={i} style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,.65)", background: i < val.length ? "#fff" : "transparent" }} />
-          ))}
-        </div>
-        <div style={{ height: 18, marginBottom: 8, fontWeight: 700, fontSize: 13, color: "#ffd9d9" }}>{err}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, maxWidth: 280, margin: "0 auto" }}>
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((k) => <button key={k} style={key} onClick={() => press(k)}>{k}</button>)}
-          <button style={keyAct} onClick={() => press("del")}>apagar</button>
-          <button style={key} onClick={() => press("0")}>0</button>
-          <button style={keyAct} onClick={() => tryUnlock(val)}>OK</button>
+    <div className={"lock-root" + (status === "ok" ? " lock-out" : "")} role="dialog" aria-modal="true" aria-label="Sessão bloqueada"
+      onKeyDown={(e) => { if (e.key === "Escape") e.preventDefault(); }}>
+      <div className="lock-card">
+        <aside className="lock-left">
+          <div className="lock-brand"><Brand nameColor="#fff" /></div>
+          <div className="lock-left-mid">
+            <h1 className="lock-h1">Sessão bloqueada<br /><span>por inatividade</span></h1>
+            <p className="lock-lead">Para proteger os teus dados, a tua sessão foi bloqueada automaticamente devido a um período de inatividade.</p>
+          </div>
+          <div className="lock-privacy">
+            <span className="lock-privacy-ic"><Icon name="shield" size={16} color="var(--accent)" /></span>
+            <div><b>A tua privacidade é importante</b><span>Só tu tens acesso às tuas informações financeiras.</span></div>
+          </div>
+        </aside>
+
+        <div className="lock-right">
+          <div className="lock-brand lock-m"><Brand nameColor="#fff" /></div>
+          <div className={"lock-ico" + (erro ? " shake" : "")}><Icon name="lock" size={30} color="var(--accent)" /></div>
+          <h2 className="lock-h2 lock-d">Bem-vindo de volta!</h2>
+          <h2 className="lock-h2 lock-m">Sessão bloqueada<br /><span>por inatividade</span></h2>
+          <p className="lock-sub lock-d">Introduz o teu {podePass ? "PIN ou palavra-passe" : "PIN"} para continuar.</p>
+          <p className="lock-sub lock-m">Para proteger os teus dados, a tua sessão foi bloqueada por segurança.</p>
+
+          {podePass && (
+            <div className="lock-tabs">
+              <button type="button" className={"lock-tab" + (tab === "pin" ? " on" : "")} onClick={() => { setTab("pin"); setMsg(""); setStatus("idle"); }}>PIN</button>
+              <button type="button" className={"lock-tab" + (tab === "pass" ? " on" : "")} onClick={() => { setTab("pass"); setMsg(""); setStatus("idle"); }}>Palavra-passe</button>
+              <span className="lock-tab-ink" style={{ transform: tab === "pass" ? "translateX(100%)" : "translateX(0)" }} />
+            </div>
+          )}
+
+          {tab === "pin" ? (
+            <div className={"lock-pane" + (erro ? " shake" : "")}>
+              <div className="lock-pin-label">Insere o teu PIN de 4 dígitos</div>
+              <div className="lock-pin">
+                {digits.map((d, i) => (
+                  <input key={i} ref={refs[i]} className={"lock-pin-box" + (erro ? " err" : "")} inputMode="numeric" maxLength={1} type="password"
+                    value={d} disabled={ocupado} aria-label={"Dígito " + (i + 1)}
+                    onChange={(e) => onDigit(i, e.target.value)} onKeyDown={(e) => onKey(i, e)} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={"lock-pane" + (erro ? " shake" : "")}>
+              <div className="lock-pass">
+                <input className={"input lock-pass-input" + (erro ? " err" : "")} type={showPass ? "text" : "password"} value={pass} placeholder="A tua palavra-passe"
+                  autoFocus disabled={ocupado} onChange={(e) => { setPass(e.target.value); setMsg(""); if (status === "error") setStatus("idle"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") validarPass(); }} />
+                <button type="button" className="lock-eye" onClick={() => setShowPass((v) => !v)} title={showPass ? "Esconder" : "Mostrar"}><Icon name={showPass ? "eyeOff" : "eye"} size={17} color="rgba(255,255,255,.55)" /></button>
+              </div>
+            </div>
+          )}
+
+          <div className={"lock-msg" + (erro ? " show" : "")}>{msg}</div>
+
+          <button className="lock-btn" disabled={ocupado} onClick={acionar}>
+            {status === "validating" ? "A validar…" : status === "ok" ? "Desbloqueado ✓" : "Desbloquear"}
+          </button>
+
+          {podePass && (
+            <>
+              <div className="lock-or"><span>ou</span></div>
+              <button type="button" className="lock-alt" onClick={() => { setTab(tab === "pin" ? "pass" : "pin"); setMsg(""); setStatus("idle"); }}>
+                <Icon name="lock" size={15} color="rgba(255,255,255,.75)" /> {tab === "pin" ? "Usar palavra-passe" : "Usar PIN"}
+              </button>
+            </>
+          )}
+
+          <div className="lock-privacy lock-m" style={{ marginTop: 24 }}>
+            <span className="lock-privacy-ic"><Icon name="shield" size={16} color="var(--accent)" /></span>
+            <div><b>A tua privacidade é importante</b><span>Só tu tens acesso às tuas informações financeiras.</span></div>
+          </div>
+
+          <div className="lock-foot">
+            <div className="lock-foot-t"><Icon name="lock" size={13} color="rgba(255,255,255,.5)" /> <b>Segurança em primeiro lugar</b></div>
+            <span>A tua sessão será desbloqueada apenas por ti.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -105,7 +202,7 @@ function RLPinSetup({ onClose }) {
   const [b, setB] = React.useState("");
   const [err, setErr] = React.useState("");
   const ok = () => {
-    if (!/^\d{4,6}$/.test(a)) return setErr("O PIN deve ter 4 a 6 dígitos.");
+    if (!/^\d{4}$/.test(a)) return setErr("O PIN deve ter exatamente 4 dígitos.");
     if (a !== b) return setErr("Os PINs não coincidem.");
     window.RendeLock.setPin(a); onClose();
   };
@@ -115,8 +212,8 @@ function RLPinSetup({ onClose }) {
         <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" onClick={ok}><Icon name="check" size={15} color="#fff" /> Definir</button>
       </>}>
-      <Field label="Novo PIN (4 a 6 dígitos)"><input className="input" type="password" inputMode="numeric" maxLength={6} autoFocus value={a} onChange={(e) => setA(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></Field>
-      <Field label="Confirmar PIN"><input className="input" type="password" inputMode="numeric" maxLength={6} value={b} onChange={(e) => setB(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></Field>
+      <Field label="Novo PIN (4 dígitos)"><input className="input" type="password" inputMode="numeric" maxLength={4} autoFocus value={a} onChange={(e) => setA(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></Field>
+      <Field label="Confirmar PIN"><input className="input" type="password" inputMode="numeric" maxLength={4} value={b} onChange={(e) => setB(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></Field>
       {err && <div className="alert bad" style={{ marginTop: 4, padding: "9px 12px" }}><Icon name="info" size={16} color="var(--neg)" /><span style={{ fontSize: 12.5, fontWeight: 700 }}>{err}</span></div>}
     </Modal>
   );
