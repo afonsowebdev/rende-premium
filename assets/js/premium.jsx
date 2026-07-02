@@ -1481,16 +1481,16 @@ function SubscricoesInner() {
   const [modal, setModal] = React.useState(false);
   const [editId, setEditId] = React.useState(null);
   const [menuId, setMenuId] = React.useState(null);
+  const [menuPos, setMenuPos] = React.useState({ top: 0, right: 0 });
   const [q, setQ] = React.useState("");
   const [filtro, setFiltro] = React.useState("todas");
   const [ordem, setOrdem] = React.useState("nome");
   const [page, setPage] = React.useState(1);
   const [loading, setLoading] = React.useState(true);
-  const [analise, setAnalise] = React.useState(false);
   const pageSize = 6;
 
   React.useEffect(() => { const t = setTimeout(() => setLoading(false), 340); return () => clearTimeout(t); }, []);
-  React.useEffect(() => { if (!menuId) return; const h = () => setMenuId(null); document.addEventListener("click", h); return () => document.removeEventListener("click", h); }, [menuId]);
+  React.useEffect(() => { if (!menuId) return; const h = () => setMenuId(null); document.addEventListener("click", h); window.addEventListener("scroll", h, true); window.addEventListener("resize", h); return () => { document.removeEventListener("click", h); window.removeEventListener("scroll", h, true); window.removeEventListener("resize", h); }; }, [menuId]);
   React.useEffect(() => { setPage(1); }, [q, filtro, ordem]);
 
   const isPago = (id) => !!(pagos[id] && pagos[id][mes]);
@@ -1514,7 +1514,6 @@ function SubscricoesInner() {
 
   const sugestoes = [];
   Object.keys(porCat).forEach((c) => { const doCat = faturaveis.filter((s) => subCat(s) === c); if (doCat.length > 1) { const menor = Math.min.apply(null, doCat.map((s) => mensalDe(s))); sugestoes.push({ cat: c, n: doCat.length, poupanca: menor, nomes: doCat.map((s) => s.nome) }); } });
-  const poupancaTotal = sugestoes.reduce((a, x) => a + x.poupanca, 0);
 
   let lista = todas.slice();
   if (q.trim()) { const k = q.trim().toLowerCase(); lista = lista.filter((s) => s.nome.toLowerCase().includes(k) || subCatMeta(subCat(s)).nome.toLowerCase().includes(k)); }
@@ -1577,9 +1576,9 @@ function SubscricoesInner() {
                       <td className="muted sub-col-m">{s.metodo || "—"}</td>
                       <td>{subEstadoPill(s)}</td>
                       <td className="sub-col-act">
-                        <button className="icon-btn" title="Ações" onClick={(e) => { e.stopPropagation(); setMenuId(menuId === s.id ? null : s.id); }}><Icon name="dots" size={18} color="var(--ink-2)" /></button>
-                        {menuId === s.id && (
-                          <div className="ph-menu" onClick={(e) => e.stopPropagation()}>
+                        <button className="icon-btn" title="Ações" onClick={(e) => { e.stopPropagation(); if (menuId === s.id) { setMenuId(null); return; } const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ top: Math.round(r.bottom + 6), right: Math.round(window.innerWidth - r.right) }); setMenuId(s.id); }}><Icon name="dots" size={18} color="var(--ink-2)" /></button>
+                        {menuId === s.id && ReactDOM.createPortal(
+                          <div className="ph-menu sub-menu-pop" style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 400 }} onClick={(e) => e.stopPropagation()}>
                             <button onClick={() => { togglePago(s.id); setMenuId(null); }}><Icon name="check" size={15} color="var(--ink-2)" /> {isPago(s.id) ? "Desmarcar pago (mês)" : "Marcar pago (mês)"}</button>
                             <button onClick={() => { abrirEdit(s.id); setMenuId(null); }}><Icon name="edit" size={15} color="var(--ink-2)" /> Editar</button>
                             {subEstado(s) === "pausada"
@@ -1589,8 +1588,7 @@ function SubscricoesInner() {
                               ? <button onClick={() => { setEstado(s.id, "ativa"); setMenuId(null); }}><Icon name="check" size={15} color="var(--ink-2)" /> Reativar</button>
                               : <button onClick={() => { setEstado(s.id, "cancelada"); setMenuId(null); }}><Icon name="x" size={15} color="var(--ink-2)" /> Cancelar</button>}
                             <button className="danger" onClick={() => { apagar(s.id); setMenuId(null); }}><Icon name="trash" size={15} color="var(--neg)" /> Eliminar</button>
-                          </div>
-                        )}
+                          </div>, document.body)}
                       </td>
                     </tr>
                   );
@@ -1607,18 +1605,6 @@ function SubscricoesInner() {
             </div>
           )}
 
-          <div className="card card-pad sub-discover">
-            <div className="sub-disc-ic"><Icon name="spark" size={22} color="var(--accent)" /></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <b style={{ fontSize: 15 }}>Descobrir oportunidades de poupança</b>
-              <div className="muted" style={{ fontSize: 13, marginTop: 3, lineHeight: 1.55 }}>
-                {analise
-                  ? (sugestoes.length ? "Encontrámos " + sugestoes.length + " categoria(s) com serviços a mais. Poupança potencial de cerca de " + BM.eur(poupancaTotal) + "/mês (" + BM.eur(poupancaTotal * 12) + "/ano)." : "Boa! Não há serviços duplicados — as tuas subscrições parecem otimizadas. 🎉")
-                  : "Analisa as tuas subscrições para encontrar serviços semelhantes, duplicados ou pouco usados."}
-              </div>
-            </div>
-            <button className="btn btn-primary" style={{ flex: "none" }} onClick={() => setAnalise(true)}><Icon name="spark" size={15} color="#fff" /> Analisar subscrições</button>
-          </div>
         </div>
 
         <div className="ph-aside">
