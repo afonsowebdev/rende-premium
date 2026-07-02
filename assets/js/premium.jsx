@@ -1605,6 +1605,11 @@ function SubscricoesInner() {
             </div>
           )}
 
+          <div className="sub-cal-block">
+            <div className="prem-sec-t" style={{ marginBottom: 4 }}>Calendário de renovações</div>
+            <div className="sub-sec-sub">Todas as datas de renovação do mês, num relance.</div>
+            <div className="sub-cal"><SubCalendario subs={todas} /></div>
+          </div>
         </div>
 
         <div className="ph-aside">
@@ -1648,12 +1653,6 @@ function SubscricoesInner() {
               ))}
           </div>
         </div>
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        <div className="prem-sec-t" style={{ marginBottom: 4 }}>Calendário de renovações</div>
-        <div className="sub-sec-sub">Todas as datas de renovação do mês, num relance.</div>
-        <div className="sub-cal"><SubCalendario subs={todas} /></div>
       </div>
       </>}
 
