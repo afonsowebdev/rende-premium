@@ -115,8 +115,13 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
   const fin = useFinance();
   const acc = fin.account || {};
   const nome = acc.nome || "Conta";
+  const prem = typeof usePremium === "function" ? usePremium() : null;
+  const isPremium = prem ? !!prem.get().premium : false;
   const [menu, setMenu] = React.useState(false);
+  const [q, setQ] = React.useState("");
+  const searchRef = React.useRef(null);
   const wrapRef = React.useRef(null);
+
   React.useEffect(() => {
     if (!menu) return;
     const fora = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setMenu(false); };
@@ -125,9 +130,32 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc); };
   }, [menu]);
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current && searchRef.current.focus();
+      }
+      if (e.key === "Escape" && document.activeElement === searchRef.current) {
+        setQ("");
+        searchRef.current.blur();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  const handleSearch = (e) => {
+    if (e.key === "Enter" && q.trim() && go) {
+      go("historico");
+      searchRef.current && searchRef.current.blur();
+    }
+  };
+
   return (
     <div className="topbar">
-      <div className="row topbar-left" style={{ gap: 11, minWidth: 0 }}>
+      <div className="row topbar-left" style={{ gap: 10, minWidth: 0, flexShrink: 0 }}>
         {onMenu && (
           <button className={"menu-btn" + (menuOpen ? " open" : "")} onClick={onMenu} aria-label="Abrir menu" aria-expanded={!!menuOpen} title="Menu">
             <span className="hamb" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -138,24 +166,42 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
           {sub && <p className="page-sub">{sub}</p>}
         </div>
       </div>
+
       {onMenu && (
         <div className="topbar-logo show-mobile" aria-hidden="true">
           <Brand nameColor="var(--ink)" />
         </div>
       )}
-      <div className="topbar-actions">
+
+      <div className="topbar-search hide-mobile" role="search" onClick={() => searchRef.current && searchRef.current.focus()}>
+        <Icon name="search" size={15} color="var(--ink-3)" />
+        <input
+          ref={searchRef}
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={handleSearch}
+          placeholder="Pesquisar transações, grupos, categorias..."
+          aria-label="Pesquisa global"
+        />
+        <span className="kbd" aria-hidden="true">⌘K</span>
+      </div>
+
+      <div className="topbar-actions" style={{ flexShrink: 0 }}>
         {onToggleOcultar && (
           <button className="icon-btn hide-mobile" onClick={onToggleOcultar} title={ocultar ? "Mostrar valores" : "Ocultar valores"} aria-pressed={ocultar}>
             <Icon name={ocultar ? "eyeOff" : "eye"} size={18} />
           </button>
         )}
         <NotifBell />
-        <button className="icon-btn hide-mobile" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Mudar tema">
+        <button className="icon-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title={theme === "dark" ? "Modo claro" : "Modo escuro"} aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}>
           <Icon name={theme === "dark" ? "sun" : "moon"} size={18} />
         </button>
+        <div className="topbar-sep hide-mobile" aria-hidden="true" />
         <div className="topbar-userwrap hide-mobile" ref={wrapRef}>
-          <button className="topbar-avatar" onClick={() => setMenu((v) => !v)} aria-haspopup="menu" aria-expanded={menu} title={nome}>
-            <Avatar account={acc} size={36} />
+          <button className={"topbar-user" + (isPremium ? " is-prem" : "")} onClick={() => setMenu((v) => !v)} aria-haspopup="menu" aria-expanded={menu} title={nome}>
+            <Avatar account={acc} size={28} />
+            <span className={"tu-chev" + (menu ? " open" : "")}><Icon name="chevR" size={11} color="var(--ink-3)" /></span>
           </button>
           {menu && (
             <div className="user-menu" role="menu">
@@ -164,6 +210,7 @@ function Topbar({ title, sub, theme, setTheme, onLogout, ocultar, onToggleOculta
                 <div style={{ minWidth: 0 }}>
                   <div className="um-name">{nome}</div>
                   {acc.email && <div className="um-mail">{acc.email}</div>}
+                  {isPremium && <span className="um-premium-tag">Premium</span>}
                 </div>
               </div>
               <button className="user-menu-item" role="menuitem" onClick={() => { setMenu(false); go && go("perfil"); }}>
