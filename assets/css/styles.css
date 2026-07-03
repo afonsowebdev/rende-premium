@@ -48,18 +48,18 @@
 
 /* ---- DARK ---- */
 [data-theme="dark"] {
-  --bg: #000000;
-  --surface: #0d0d0d;
-  --surface-2: #141414;
+  --bg: #111111;
+  --surface: #1a1a1a;
+  --surface-2: #222222;
   --ink: #f0f0f0;
   --ink-2: #9a9a9a;
   --ink-3: #606060;
-  --border: #1f1f1f;
-  --border-strong: #2a2a2a;
-  --navy: #000000;
+  --border: #2e2e2e;
+  --border-strong: #3a3a3a;
+  --navy: #111111;
   --navy-ink: #f0f0f0;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .45), 0 12px 32px -14px rgba(0, 0, 0, .75);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40);
+  --shadow: 0 1px 3px rgba(0, 0, 0, .30), 0 12px 32px -14px rgba(0, 0, 0, .45);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
 }
 
 * {
@@ -7234,55 +7234,126 @@ body.drawer-lock {
     animation: none;
   }
 }
+
 /* ================================================================
    RENDE+ · Redesign: Cabeçalho Profissional · Bordas · Radius
    ================================================================ */
 
 /* ----- Border radius: menos arredondado em toda a UI ----- */
-.btn                 { border-radius: 7px; }
-.btn-primary         { border-radius: 7px; }
-.icon-btn            { border-radius: 7px; }
-.nav-item            { border-radius: 7px; }
-.user-chip           { border-radius: 9px; }
-.seg                 { border-radius: 9px; }
-.seg button,
-.seg > button        { border-radius: 6px; }
-.modal               { border-radius: 10px; }
-.notif-pop           { border-radius: 10px; }
-.user-menu           { border-radius: 8px; }
-.user-menu-item      { border-radius: 5px; }
-.dr-item             { border-radius: 7px; }
-.drawer-acct-head    { border-radius: 8px; }
-.drawer-x            { border-radius: 7px; }
-.alert               { border-radius: 7px; }
-.prem-stat           { border-radius: 7px; }
-.li-ico              { border-radius: 8px; }
-.brand-mark          { border-radius: 9px; }
-.kpi-ico             { border-radius: 10px; }
-.chip                { border-radius: 6px; }
-.chip.sel            { border-radius: 6px; }
+.btn {
+  border-radius: 7px;
+}
 
-/* ----- Bordas dos cartões: verde leve (light) · branco subtil (dark) ----- */
+.btn-primary {
+  border-radius: 7px;
+}
+
+.icon-btn {
+  border-radius: 7px;
+}
+
+.nav-item {
+  border-radius: 7px;
+}
+
+.user-chip {
+  border-radius: 9px;
+}
+
+.seg {
+  border-radius: 9px;
+}
+
+.seg button,
+.seg>button {
+  border-radius: 6px;
+}
+
+.modal {
+  border-radius: 10px;
+}
+
+.notif-pop {
+  border-radius: 10px;
+}
+
+.user-menu {
+  border-radius: 8px;
+}
+
+.user-menu-item {
+  border-radius: 5px;
+}
+
+.dr-item {
+  border-radius: 7px;
+}
+
+.drawer-acct-head {
+  border-radius: 8px;
+}
+
+.drawer-x {
+  border-radius: 7px;
+}
+
+.alert {
+  border-radius: 7px;
+}
+
+.prem-stat {
+  border-radius: 7px;
+}
+
+.li-ico {
+  border-radius: 8px;
+}
+
+.brand-mark {
+  border-radius: 9px;
+}
+
+.kpi-ico {
+  border-radius: 10px;
+}
+
+.chip {
+  border-radius: 6px;
+}
+
+.chip.sel {
+  border-radius: 6px;
+}
+
+/* ----- Cartões: sem borda, só sombra adaptada ao tema ----- */
 [data-theme="light"] .card,
 [data-theme="light"] .kpi {
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, #dde8df);
-  box-shadow: 0 2px 6px -2px rgba(0,0,0,.04), 0 8px 22px -14px rgba(0,0,0,.08);
+  border: none;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, .07),
+    0 6px 20px -8px rgba(0, 0, 0, .12);
 }
 
 [data-theme="light"] .card.is-hover:hover,
 [data-theme="light"] .kpi.is-hover:hover {
-  border-color: color-mix(in srgb, var(--accent) 35%, #dde8df);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, .09),
+    0 12px 28px -8px rgba(0, 0, 0, .16);
 }
 
 [data-theme="dark"] .card,
 [data-theme="dark"] .kpi {
-  border: 1px solid #252525;
-  box-shadow: 0 2px 8px -3px rgba(0,0,0,.45), 0 10px 28px -16px rgba(0,0,0,.65);
+  border: none;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, .35),
+    0 6px 20px -8px rgba(0, 0, 0, .50);
 }
 
 [data-theme="dark"] .card.is-hover:hover,
 [data-theme="dark"] .kpi.is-hover:hover {
-  border-color: #363636;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, .40),
+    0 12px 28px -8px rgba(0, 0, 0, .58);
 }
 
 /* ----- Bordas globais com toque verde (light) ----- */
@@ -7321,8 +7392,8 @@ body.drawer-lock {
 }
 
 [data-theme="dark"] .topbar-search {
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.10);
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .10);
 }
 
 .topbar-search:focus-within {
@@ -7454,15 +7525,15 @@ body.drawer-lock {
 
 /* ----- Sidebar: scrollbar adaptada ao tema ----- */
 [data-theme="light"] .sidebar {
-  scrollbar-color: rgba(0,0,0,.12) transparent;
+  scrollbar-color: rgba(0, 0, 0, .12) transparent;
 }
 
 [data-theme="light"] .sidebar::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,.10);
+  background: rgba(0, 0, 0, .10);
 }
 
 [data-theme="light"] .sidebar:hover::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,.20);
+  background: rgba(0, 0, 0, .20);
 }
 
 /* ----- Topbar: avatar com ring ao hover ----- */
@@ -7474,13 +7545,13 @@ body.drawer-lock {
 [data-theme="dark"] .user-menu,
 [data-theme="dark"] .notif-pop {
   border-color: #2a2a2a;
-  box-shadow: 0 24px 56px -20px rgba(0,0,0,.85), 0 4px 16px -4px rgba(0,0,0,.6);
+  box-shadow: 0 24px 56px -20px rgba(0, 0, 0, .85), 0 4px 16px -4px rgba(0, 0, 0, .6);
 }
 
 [data-theme="light"] .user-menu,
 [data-theme="light"] .notif-pop {
   border-color: color-mix(in srgb, var(--accent) 14%, #e0e0e0);
-  box-shadow: 0 16px 40px -16px rgba(0,0,0,.16), 0 2px 8px -2px rgba(0,0,0,.08);
+  box-shadow: 0 16px 40px -16px rgba(0, 0, 0, .16), 0 2px 8px -2px rgba(0, 0, 0, .08);
 }
 
 /* ================================================================
@@ -7489,16 +7560,18 @@ body.drawer-lock {
 
 /* ----- Topbar: mais padding lateral e altura equilibrada ----- */
 .topbar {
-  padding: 0 40px;
+  padding: 45px;
   height: 64px;
   gap: 16px;
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, .04), 0 8px 22px -14px rgba(0, 0, 0, .08);
 }
 
 @media (max-width: 860px) {
   .topbar {
-    padding: 0 16px;
+    padding: 25px;
     height: 56px;
     gap: 8px;
+    box-shadow: 0 2px 6px -2px rgba(0, 0, 0, .04), 0 8px 22px -14px rgba(0, 0, 0, .08);
   }
 }
 
@@ -7520,8 +7593,8 @@ body.drawer-lock {
 }
 
 [data-theme="dark"] .topbar-search {
-  background: rgba(255,255,255,.055);
-  border-color: rgba(255,255,255,.09);
+  background: rgba(255, 255, 255, .055);
+  border-color: rgba(255, 255, 255, .09);
 }
 
 .topbar-search:focus-within {
